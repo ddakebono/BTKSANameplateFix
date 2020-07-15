@@ -27,7 +27,6 @@ namespace BTKSANameplateFix
         public static BTKSANameplateFix instance;
 
         public HarmonyInstance harmony;
-        public bool enableHiddenCustomNameplates = false;
 
         private string settingsCategory = "BTKSANameplateFix";
         private string hiddenCustomSetting = "enableHiddenCustomNameplates";
