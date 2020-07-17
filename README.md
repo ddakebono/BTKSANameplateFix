@@ -20,6 +20,7 @@ The mod will initially only be fixing the nameplate position, but you can enable
 
 ## Hidden Custom Nameplate
 To use this feature you must set the custom nameplate prefab to disabled like shown below, it must also be named the same.
+
 ![HiddenCustom1](http://aurares.potato.moe/git/HiddenCustom1.png) ![HiddenCustom2](http://aurares.potato.moe/git/HiddenCustom2.png)
 
 Note that this is only LOCAL, so if you set it up on your avatar others using the mod will be able to see it.
