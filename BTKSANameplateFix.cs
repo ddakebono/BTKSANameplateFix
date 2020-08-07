@@ -18,7 +18,7 @@ namespace BTKSANameplateFix
         public const string Name = "BTKSANameplateFix"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "1.0.0"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "1.0.1"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -76,9 +76,9 @@ namespace BTKSANameplateFix
                     //User is remote, apply fix
                     MelonModLogger.Log($"New user or avatar change! Applying Fix on { user.displayName }");
                     Vector3 npPos = user.vrcPlayer.field_Internal_VRCPlayer_0.field_Private_VRCWorldPlayerUiProfile_0.gameObject.transform.position;
-                    if (user.vrcPlayer.prop_VRCAvatarManager_0.prop_VRC_AvatarDescriptor_0 != null)
+                    if (user.vrcPlayer.prop_VRCAvatarManager_0.Method_Public_VRC_AvatarDescriptor_0() != null)
                     {
-                        npPos.y = user.vrcPlayer.field_Private_VRCAvatarManager_0.prop_VRC_AvatarDescriptor_0.ViewPosition.y + user.vrcPlayer.transform.position.y + 0.5f;
+                        npPos.y = user.vrcPlayer.field_Private_VRCAvatarManager_0.Method_Public_VRC_AvatarDescriptor_0().ViewPosition.y + user.vrcPlayer.transform.position.y + 0.5f;
                         user.vrcPlayer.field_Internal_VRCPlayer_0.field_Private_VRCWorldPlayerUiProfile_0.gameObject.transform.position = npPos;
                     }
 
