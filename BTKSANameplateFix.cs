@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 using VRC;
+using VRC.SDKBase;
 
 namespace BTKSANameplateFix
 {
@@ -18,7 +19,7 @@ namespace BTKSANameplateFix
         public const string Name = "BTKSANameplateFix"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "1.0.1"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "1.0.2"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -30,6 +31,9 @@ namespace BTKSANameplateFix
 
         private string settingsCategory = "BTKSANameplateFix";
         private string hiddenCustomSetting = "enableHiddenCustomNameplates";
+
+        //Helper PropertyInfo
+        PropertyInfo avatarDescriptProperty;
 
         public override void VRChat_OnUiManagerInit()
         {
@@ -51,6 +55,8 @@ namespace BTKSANameplateFix
             //Initalize Harmony
             harmony = HarmonyInstance.Create("BTKStandalone");
             harmony.Patch(typeof(VRCAvatarManager).GetMethod("Method_Private_Boolean_GameObject_String_Single_0", BindingFlags.Instance | BindingFlags.Public), null, new HarmonyMethod(typeof(BTKSANameplateFix).GetMethod("OnAvatarInit", BindingFlags.NonPublic | BindingFlags.Static)));
+
+            avatarDescriptProperty = typeof(VRCAvatarManager).GetProperty("prop_VRC_AvatarDescriptor_0", BindingFlags.Public | BindingFlags.Instance, null, typeof(VRC_AvatarDescriptor), new Type[0], null);
         }
 
         private static void OnAvatarInit(GameObject __0, ref VRCAvatarManager __instance, ref bool __result)
@@ -76,9 +82,10 @@ namespace BTKSANameplateFix
                     //User is remote, apply fix
                     MelonModLogger.Log($"New user or avatar change! Applying Fix on { user.displayName }");
                     Vector3 npPos = user.vrcPlayer.field_Internal_VRCPlayer_0.field_Private_VRCWorldPlayerUiProfile_0.gameObject.transform.position;
-                    if (user.vrcPlayer.prop_VRCAvatarManager_0.Method_Public_VRC_AvatarDescriptor_0() != null)
+                    object avatarDescriptor = avatarDescriptProperty.GetValue(user.vrcPlayer.prop_VRCAvatarManager_0);
+                    if (avatarDescriptor != null)
                     {
-                        npPos.y = user.vrcPlayer.field_Private_VRCAvatarManager_0.Method_Public_VRC_AvatarDescriptor_0().ViewPosition.y + user.vrcPlayer.transform.position.y + 0.5f;
+                        npPos.y = ((VRC_AvatarDescriptor)avatarDescriptor).ViewPosition.y + user.vrcPlayer.transform.position.y + 0.5f;
                         user.vrcPlayer.field_Internal_VRCPlayer_0.field_Private_VRCWorldPlayerUiProfile_0.gameObject.transform.position = npPos;
                     }
 
