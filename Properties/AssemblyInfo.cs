@@ -33,7 +33,7 @@ using MelonLoader;
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.0.2")]
-[assembly: AssemblyFileVersion("1.0.2")]
-[assembly: MelonModInfo(typeof(BTKSANameplateFix.BTKSANameplateFix), BTKSANameplateFix.BuildInfo.Name, BTKSANameplateFix.BuildInfo.Version, BTKSANameplateFix.BuildInfo.Author, BTKSANameplateFix.BuildInfo.DownloadLink)]
-[assembly: MelonModGame("VRChat", "VRChat")]
+[assembly: AssemblyVersion("1.0.3")]
+[assembly: AssemblyFileVersion("1.0.3")]
+[assembly: MelonInfo(typeof(BTKSANameplateFix.BTKSANameplateFix), BTKSANameplateFix.BuildInfo.Name, BTKSANameplateFix.BuildInfo.Version, BTKSANameplateFix.BuildInfo.Author, BTKSANameplateFix.BuildInfo.DownloadLink)]
+[assembly: MelonGame("VRChat", "VRChat")]

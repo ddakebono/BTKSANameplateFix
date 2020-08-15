@@ -69,6 +69,7 @@
     <Reference Include="VRCSDK2">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\VRChat\MelonLoader\Managed\VRCSDK2.dll</HintPath>
     </Reference>
+    <Reference Include="VRCSDK3A, Version=3.7.1.6, Culture=neutral, PublicKeyToken=null" />
     <Reference Include="VRCSDKBase">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\VRChat\MelonLoader\Managed\VRCSDKBase.dll</HintPath>
     </Reference>
