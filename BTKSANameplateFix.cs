@@ -19,7 +19,7 @@ namespace BTKSANameplateFix
         public const string Name = "BTKSANameplateFix"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "1.0.3"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "1.0.4"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -54,7 +54,7 @@ namespace BTKSANameplateFix
 
             //Initalize Harmony
             harmony = HarmonyInstance.Create("BTKStandalone");
-            harmony.Patch(typeof(VRCAvatarManager).GetMethod("Method_Private_Boolean_GameObject_String_Single_0", BindingFlags.Instance | BindingFlags.Public), null, new HarmonyMethod(typeof(BTKSANameplateFix).GetMethod("OnAvatarInit", BindingFlags.NonPublic | BindingFlags.Static)));
+            harmony.Patch(typeof(VRCAvatarManager).GetMethod("Method_Private_Boolean_GameObject_String_Single_PDM_0", BindingFlags.Instance | BindingFlags.Public), null, new HarmonyMethod(typeof(BTKSANameplateFix).GetMethod("OnAvatarInit", BindingFlags.NonPublic | BindingFlags.Static)));
 
             avatarDescriptProperty = typeof(VRCAvatarManager).GetProperty("prop_VRC_AvatarDescriptor_0", BindingFlags.Public | BindingFlags.Instance, null, typeof(VRC_AvatarDescriptor), new Type[0], null);
         }
