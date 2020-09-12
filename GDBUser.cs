@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using VRC;
 
-namespace BTKSANameplateFix
+namespace BTKSANameplateMod
 {
     public class GDBUser
     {
