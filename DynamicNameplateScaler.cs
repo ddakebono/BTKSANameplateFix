@@ -11,6 +11,7 @@ namespace BTKSANameplateMod
         private float minSize;
         private float maxSize;
         private float maxDist;
+        private float scaleDiff;
 
         public DynamicNameplateScaler(IntPtr ptr) : base(ptr)
         {
@@ -24,21 +25,28 @@ namespace BTKSANameplateMod
             this.minSize = minSize;
             this.maxSize = maxSize;
             this.maxDist = maxDist;
+
+            this.scaleDiff = maxSize - minSize;
+
+            setNameplateScale(true);
         }
 
         public void Update()
         {
+            setNameplateScale();
+        }
+
+        [HideFromIl2Cpp]
+        public void setNameplateScale(bool forceScale = false)
+        {
             if (ValidatePlayer(Player.prop_Player_0))
             {
                 float currentDist = Vector3.Distance(Player.prop_Player_0.field_Internal_VRCPlayer_0.transform.position, user.transform.position);
-                if (currentDist <= maxDist)
+                if (currentDist <= maxDist || forceScale)
                 {
-                    float nameplateScale = maxSize * (currentDist / maxDist);
-                    if (nameplateScale >= minSize)
-                    {
-                        Vector3 newScale = new Vector3(nameplateScale, nameplateScale, nameplateScale);
-                        user.field_Internal_VRCPlayer_0.field_Private_VRCWorldPlayerUiProfile_0.gameObject.transform.localScale = newScale;
-                    }
+                    float nameplateScale = (scaleDiff * (currentDist / maxDist))+minSize;
+                    Vector3 newScale = new Vector3(nameplateScale, nameplateScale, nameplateScale);
+                    user.field_Internal_VRCPlayer_0.field_Private_VRCWorldPlayerUiProfile_0.gameObject.transform.localScale = newScale;
                 }
             }
         }

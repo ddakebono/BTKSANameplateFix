@@ -15,7 +15,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "1.1.0"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "1.1.1"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -132,8 +132,8 @@ namespace BTKSANameplateMod
                     }
 
                     //Check for DynamicNameplateScaler component
-                    GameObject.Destroy(nameplate.GetComponent<DynamicNameplateScaler>());
-                    if (nameplateScale != 0.0015f && !(friend && MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates)))
+                    resetNameplate(nameplate);
+                    if (nameplateScale != nameplateDefaultSize && !(friend && MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates)))
                     {
                         if (MelonPrefs.GetBool(settingsCategory, dynamicResizerSetting))
                         {
@@ -157,6 +157,16 @@ namespace BTKSANameplateMod
                         }
                     }
                 }
+            }
+        }
+
+        private void resetNameplate(GameObject nameplate)
+        {
+            nameplate.transform.localScale = new Vector3(nameplateDefaultSize, nameplateDefaultSize, nameplateDefaultSize);
+
+            foreach(DynamicNameplateScaler scaler in nameplate.GetComponents<DynamicNameplateScaler>())
+            {
+                GameObject.Destroy(scaler);
             }
         }
 
