@@ -41,8 +41,8 @@ namespace BTKSANameplateMod
         {
             if (ValidatePlayer(Player.prop_Player_0))
             {
-                float currentDist = Vector3.Distance(Player.prop_Player_0.field_Internal_VRCPlayer_0.transform.position, user.transform.position);
-                if (currentDist <= maxDist || forceScale)
+                float currentDist = Vector3.Distance(Player.prop_Player_0.field_Internal_VRCPlayer_0.transform.position, user.transform.position) - .2f;
+                if ((currentDist <= maxDist && currentDist>=0) || forceScale)
                 {
                     float nameplateScale = (scaleDiff * (currentDist / maxDist))+minSize;
                     Vector3 newScale = new Vector3(nameplateScale, nameplateScale, nameplateScale);
