@@ -6,6 +6,7 @@ using System.Reflection;
 using UnhollowerRuntimeLib;
 using UnityEngine;
 using VRC;
+using VRC.Core;
 using VRC.SDKBase;
 
 namespace BTKSANameplateMod
@@ -15,7 +16,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "1.1.2"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "1.1.3"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -120,10 +121,14 @@ namespace BTKSANameplateMod
 
                     float nameplateScale = (MelonPrefs.GetInt(settingsCategory, nameplateScaleSetting)/100f)*0.0015f;
 
+                    //Reset Nameplate to default state and remove DynamicNameplateScalers
+                    resetNameplate(nameplate);
+
                     //Disable nameplates on friends
-                    if(MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates))
+                    if (MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates))
                     {
-                        if (user.vrcPlayer.field_Private_APIUser_0.isFriend)
+
+                        if (APIUser.IsFriendsWith(user.vrcPlayer.field_Private_APIUser_0.id))
                         {
                             Vector3 newScale = new Vector3(0, 0, 0);
                             nameplate.transform.localScale = newScale;
@@ -131,8 +136,7 @@ namespace BTKSANameplateMod
                         }
                     }
 
-                    //Check for DynamicNameplateScaler component
-                    resetNameplate(nameplate);
+                    //Setup static or dynamic scale
                     if (nameplateScale != nameplateDefaultSize && !(friend && MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates)))
                     {
                         if (MelonPrefs.GetBool(settingsCategory, dynamicResizerSetting))
@@ -162,12 +166,12 @@ namespace BTKSANameplateMod
 
         private void resetNameplate(GameObject nameplate)
         {
-            nameplate.transform.localScale = new Vector3(nameplateDefaultSize, nameplateDefaultSize, nameplateDefaultSize);
-
             foreach(DynamicNameplateScaler scaler in nameplate.GetComponents<DynamicNameplateScaler>())
             {
                 GameObject.Destroy(scaler);
             }
+
+            nameplate.transform.localScale = new Vector3(nameplateDefaultSize, nameplateDefaultSize, nameplateDefaultSize);
         }
 
         private void getPrefsLocal()

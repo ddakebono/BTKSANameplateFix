@@ -27,8 +27,6 @@ namespace BTKSANameplateMod
             this.maxDist = maxDist;
 
             this.scaleDiff = maxSize - minSize;
-
-            setNameplateScale(true);
         }
 
         public void Update()
@@ -37,12 +35,12 @@ namespace BTKSANameplateMod
         }
 
         [HideFromIl2Cpp]
-        public void setNameplateScale(bool forceScale = false)
+        public void setNameplateScale()
         {
             if (ValidatePlayer(Player.prop_Player_0))
             {
                 float currentDist = Vector3.Distance(Player.prop_Player_0.field_Internal_VRCPlayer_0.transform.position, user.transform.position) - .2f;
-                if ((currentDist <= maxDist && currentDist>=0) || forceScale)
+                if (currentDist <= maxDist && currentDist>=0)
                 {
                     float nameplateScale = (scaleDiff * (currentDist / maxDist))+minSize;
                     Vector3 newScale = new Vector3(nameplateScale, nameplateScale, nameplateScale);
