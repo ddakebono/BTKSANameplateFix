@@ -15,7 +15,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "1.1.1"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "1.1.2"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
