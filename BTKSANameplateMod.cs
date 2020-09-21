@@ -16,7 +16,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "1.1.3"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "1.2.0"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -27,10 +27,12 @@ namespace BTKSANameplateMod
         public HarmonyInstance harmony;
 
         public float nameplateDefaultSize = 0.0015f;
+        public float customNameplateDefaultSize = 1.0f;
 
         private string settingsCategory = "BTKSANameplateFix";
         private string hiddenCustomSetting = "enableHiddenCustomNameplates";
         private string hideFriendsNameplates = "hideFriendsNameplates";
+        private string hideNameplateBorder = "hideNameplateBorder";
         private string nameplateScaleSetting = "nameplateScale";
         private string dynamicResizerSetting = "dynamicResizer";
         private string dynamicResizerDistance = "dynamicResizerDist";
@@ -41,9 +43,15 @@ namespace BTKSANameplateMod
         //Save prefs copy to compare for ReloadAllAvatars
         bool hiddenCustomLocal = false;
         bool hideFriendsLocal = false;
+        bool hideNameplateLocal = false;
         int scaleLocal = 100;
         bool dynamicResizerLocal = false;
         float dynamicResDistLocal = 3f;
+
+        //Assets
+        AssetBundle shaderBundle;
+        Shader borderShader;
+        Shader tagShader;
 
         public override void VRChat_OnUiManagerInit()
         {
@@ -62,12 +70,14 @@ namespace BTKSANameplateMod
             MelonPrefs.RegisterCategory(settingsCategory, "Nameplate Mod");
             MelonPrefs.RegisterBool(settingsCategory, hiddenCustomSetting, false, "Enable Hidden Custom Nameplates");
             MelonPrefs.RegisterBool(settingsCategory, hideFriendsNameplates, false, "Hide Friends Nameplates");
+            MelonPrefs.RegisterBool(settingsCategory, hideNameplateBorder, false, "Hide Nameplate Borders");
             MelonPrefs.RegisterInt(settingsCategory, nameplateScaleSetting, 100, "Nameplate Size Percentage");
             MelonPrefs.RegisterBool(settingsCategory, dynamicResizerSetting, false, "Enable Dynamic Nameplate Resizer");
             MelonPrefs.RegisterFloat(settingsCategory, dynamicResizerDistance, 3f, "Dynamic Resizer Max Distance");
 
             //Register dynamic scaler
-            ClassInjector.RegisterTypeInIl2Cpp<DynamicNameplateScaler>();
+            ClassInjector.RegisterTypeInIl2Cpp<DynamicScaler>();
+            ClassInjector.RegisterTypeInIl2Cpp<DynamicScalerCustom>();
 
             //Initalize Harmony
             harmony = HarmonyInstance.Create("BTKStandalone");
@@ -75,13 +85,16 @@ namespace BTKSANameplateMod
 
             avatarDescriptProperty = typeof(VRCAvatarManager).GetProperty("prop_VRC_AvatarDescriptor_0", BindingFlags.Public | BindingFlags.Instance, null, typeof(VRC_AvatarDescriptor), new Type[0], null);
 
+            MelonLogger.Log("Loading Assets from Embedded Bundle...");
+            loadAssets();
+
             //Load the settings to the local copy to compare with SettingsApplied
             getPrefsLocal();
         }
 
         public override void OnModSettingsApplied()
         {
-            if(hiddenCustomLocal!=MelonPrefs.GetBool(settingsCategory, hiddenCustomSetting) || hideFriendsLocal!= MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates) || scaleLocal!= MelonPrefs.GetInt(settingsCategory, nameplateScaleSetting) || dynamicResizerLocal!= MelonPrefs.GetBool(settingsCategory, dynamicResizerSetting) || dynamicResDistLocal!= MelonPrefs.GetFloat(settingsCategory, dynamicResizerDistance))
+            if (hiddenCustomLocal != MelonPrefs.GetBool(settingsCategory, hiddenCustomSetting) || hideFriendsLocal != MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates) || scaleLocal != MelonPrefs.GetInt(settingsCategory, nameplateScaleSetting) || dynamicResizerLocal != MelonPrefs.GetBool(settingsCategory, dynamicResizerSetting) || dynamicResDistLocal != MelonPrefs.GetFloat(settingsCategory, dynamicResizerDistance) || hideNameplateLocal != MelonPrefs.GetBool(settingsCategory, hideNameplateBorder))
                 VRCPlayer.field_Internal_Static_VRCPlayer_0.Method_Public_Void_Boolean_0();
 
             getPrefsLocal();
@@ -99,6 +112,10 @@ namespace BTKSANameplateMod
                 {
                     GameObject nameplate = user.vrcPlayer.field_Internal_VRCPlayer_0.field_Private_VRCWorldPlayerUiProfile_0.gameObject;
 
+                    ////
+                    /// Nameplate RNG Fix
+                    ////
+
                     //User is remote, apply fix
                     MelonLogger.Log($"New user or avatar change! Applying NameplateMod on { user.displayName }");
                     Vector3 npPos = nameplate.transform.position;
@@ -113,16 +130,20 @@ namespace BTKSANameplateMod
                     if (user.vrcPlayer.prop_VRCAvatarManager_0.prop_VRCAvatarDescriptor_0 != null)
                         viewPointY = user.vrcPlayer.prop_VRCAvatarManager_0.prop_VRCAvatarDescriptor_0.ViewPosition.y;
 
-                    if (viewPointY>0)
+                    if (viewPointY > 0)
                     {
                         npPos.y = viewPointY + user.vrcPlayer.transform.position.y + 0.5f;
                         nameplate.transform.position = npPos;
                     }
 
-                    float nameplateScale = (MelonPrefs.GetInt(settingsCategory, nameplateScaleSetting)/100f)*0.0015f;
+                    ////
+                    /// Player nameplate checks
+                    ////
+
+                    float nameplateScale = (MelonPrefs.GetInt(settingsCategory, nameplateScaleSetting) / 100f) * 0.0015f;
 
                     //Reset Nameplate to default state and remove DynamicNameplateScalers
-                    resetNameplate(nameplate);
+                    resetNameplate(nameplate, nameplateDefaultSize);
 
                     //Disable nameplates on friends
                     if (MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates))
@@ -137,41 +158,180 @@ namespace BTKSANameplateMod
                     }
 
                     //Setup static or dynamic scale
-                    if (nameplateScale != nameplateDefaultSize && !(friend && MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates)))
+                    applyScale(user, nameplate, nameplateScale, nameplateDefaultSize, friend);
+
+
+                    ////
+                    /// Custom Nameplate Checks
+                    ////
+
+                    //Grab custom nameplate object for next 2 checks
+                    Transform customNameplateObject = user.avatarObject.transform.Find("Custom Nameplate");
+                    float customNameplateScale = (MelonPrefs.GetInt(settingsCategory, nameplateScaleSetting) / 100f) * 1.0f;
+
+                    //Reset Custom Nameplate scale
+                    if (customNameplateObject != null)
+                        resetNameplate(customNameplateObject.gameObject, customNameplateDefaultSize);
+
+                    //Enable Hidden Custom Nameplate
+                    if (MelonPrefs.GetBool(settingsCategory, hiddenCustomSetting) && !(MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates) && friend))
                     {
-                        if (MelonPrefs.GetBool(settingsCategory, dynamicResizerSetting))
+
+                        if (customNameplateObject != null && !customNameplateObject.gameObject.active)
                         {
-                            DynamicNameplateScaler component = nameplate.AddComponent<DynamicNameplateScaler>();
-                            component.ApplySettings(user.vrcPlayer, nameplateScale, nameplateDefaultSize, MelonPrefs.GetFloat(settingsCategory, dynamicResizerDistance));
-                        }
-                        else
-                        {
-                            Vector3 newScale = new Vector3(nameplateScale, nameplateScale, nameplateScale);
-                            nameplate.transform.localScale = newScale;
+                            MelonLogger.Log($"Found hidden Custom Nameplate on { user.displayName }, enabling.");
+                            customNameplateObject.gameObject.SetActive(true);
                         }
                     }
 
-                    if (MelonPrefs.GetBool(settingsCategory, hiddenCustomSetting))
+                    //Check if nameplate should be hidden or resized
+                    if (customNameplateObject != null && customNameplateObject.gameObject.active)
                     {
-                        Transform nameplateObject = user.avatarObject.transform.Find("Custom Nameplate");
-                        if (nameplateObject != null && !nameplateObject.gameObject.active)
+                        if (MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates) && friend)
+                            customNameplateObject.gameObject.SetActive(false);
+
+                        Transform tagAndBGObj = customNameplateObject.Find("Tag and Background");
+                        Transform borderObj = customNameplateObject.Find("Border");
+
+                        if (tagAndBGObj != null && borderObj != null)
                         {
-                            MelonLogger.Log($"Found hidden Custom Nameplate on { user.displayName }, enabling.");
-                            nameplateObject.gameObject.SetActive(true);
+                            SkinnedMeshRenderer tagRenderer = tagAndBGObj.gameObject.GetComponent<SkinnedMeshRenderer>();
+                            SkinnedMeshRenderer borderRenderer = borderObj.gameObject.GetComponent<SkinnedMeshRenderer>();
+
+                            //Replace shaders!
+                            replaceCustomNameplateShader(tagRenderer, borderRenderer);
+
+                            //Apply scaler
+                            applyScale(user, customNameplateObject.gameObject, customNameplateScale, customNameplateDefaultSize, friend, true, tagRenderer, borderRenderer);
+                        }
+                    }
+
+                    ////
+                    /// Nameplate Misc Mods
+                    ////
+
+                    if (MelonPrefs.GetBool(settingsCategory, hideNameplateBorder))
+                    {
+                        Transform border = nameplate.transform.Find("Frames");
+                        if (border != null)
+                        {
+                            border.gameObject.active = false;
+                        }
+                    }
+
+                }
+            }
+        }
+
+        /// <summary>
+        /// Applies either static scale or DynamicScaler to target object
+        /// </summary>
+        /// <param name="user">Target player</param>
+        /// <param name="target">Target GameObject</param>
+        /// <param name="nameplateScale">New scale or target min scale</param>
+        /// <param name="defaultSize">Default size of the target GameObject</param>
+        /// <param name="isFriend"></param>
+        private void applyScale(GDBUser user, GameObject target, float nameplateScale, float defaultSize, bool isFriend, bool isCustomNameplate = false, SkinnedMeshRenderer tagRenderer = null, SkinnedMeshRenderer borderRenderer = null)
+        {
+            if (nameplateScale != nameplateDefaultSize && !(isFriend && MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates)))
+            {
+                if (MelonPrefs.GetBool(settingsCategory, dynamicResizerSetting))
+                {
+                    if (!isCustomNameplate)
+                    {
+                        DynamicScaler component = target.AddComponent<DynamicScaler>();
+                        component.ApplySettings(user.vrcPlayer, target, nameplateScale, defaultSize, MelonPrefs.GetFloat(settingsCategory, dynamicResizerDistance));
+                    }
+                    else
+                    {
+                        DynamicScalerCustom component = target.AddComponent<DynamicScalerCustom>();
+                        if (tagRenderer != null && borderRenderer!=null)
+                        {
+                            component.ApplySettings(user.vrcPlayer, borderRenderer.material, tagRenderer.material, nameplateScale, defaultSize, MelonPrefs.GetFloat(settingsCategory, dynamicResizerDistance));
+                        }
+                    }
+                }
+                else
+                {
+                    if (!isCustomNameplate)
+                    {
+                        Vector3 newScale = new Vector3(nameplateScale, nameplateScale, nameplateScale);
+                        target.transform.localScale = newScale;
+                    }
+                    else
+                    {
+                        if (tagRenderer != null)
+                        {
+                            tagRenderer.material.shader = tagShader;
+                            tagRenderer.material.SetFloat("_Scale", nameplateScale);
+                        }
+
+                        if (borderRenderer != null)
+                        {
+                            borderRenderer.material.shader = borderShader;
+                            borderRenderer.material.SetFloat("_Scale", nameplateScale);
                         }
                     }
                 }
             }
         }
 
-        private void resetNameplate(GameObject nameplate)
+        private void replaceCustomNameplateShader(SkinnedMeshRenderer tagRenderer, SkinnedMeshRenderer borderRenderer)
         {
-            foreach(DynamicNameplateScaler scaler in nameplate.GetComponents<DynamicNameplateScaler>())
+            if (tagRenderer != null)
+            {
+                tagRenderer.material.shader = tagShader;
+                tagRenderer.material.SetFloat("_Scale", 1.0f);
+            }
+
+            if (borderRenderer != null)
+            {
+                borderRenderer.material.shader = borderShader;
+                borderRenderer.material.SetFloat("_Scale", 1.0f);
+            }
+        }
+
+        private void resetNameplate(GameObject nameplate, float defaultSize)
+        {
+            foreach (DynamicScaler scaler in nameplate.GetComponents<DynamicScaler>())
             {
                 GameObject.Destroy(scaler);
             }
 
-            nameplate.transform.localScale = new Vector3(nameplateDefaultSize, nameplateDefaultSize, nameplateDefaultSize);
+            nameplate.transform.localScale = new Vector3(defaultSize, defaultSize, defaultSize);
+
+            //Reset Border Disable
+            Transform border = nameplate.transform.Find("Frames");
+            if (border != null)
+            {
+                border.gameObject.active = true;
+            }
+        }
+
+        private void loadAssets()
+        {
+            using (var assetStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("BTKSANameplateMod.assets"))
+            {
+                MelonLogger.Log("Loaded Embedded resource");
+                using (var tempStream = new MemoryStream((int)assetStream.Length))
+                {
+                    assetStream.CopyTo(tempStream);
+
+                    shaderBundle = AssetBundle.LoadFromMemory_Internal(tempStream.ToArray(), 0);
+                    shaderBundle.hideFlags |= HideFlags.DontUnloadUnusedAsset;
+                }
+            }
+
+            if (shaderBundle != null)
+            {
+                borderShader = shaderBundle.LoadAsset_Internal("CustomBorder", Il2CppType.Of<Shader>()).Cast<Shader>();
+                borderShader.hideFlags |= HideFlags.DontUnloadUnusedAsset;
+                tagShader = shaderBundle.LoadAsset_Internal("CustomTag", Il2CppType.Of<Shader>()).Cast<Shader>();
+                tagShader.hideFlags |= HideFlags.DontUnloadUnusedAsset;
+            }
+
+            MelonLogger.Log("Loaded Assets Successfully!");
+
         }
 
         private void getPrefsLocal()
@@ -181,6 +341,7 @@ namespace BTKSANameplateMod
             scaleLocal = MelonPrefs.GetInt(settingsCategory, nameplateScaleSetting);
             dynamicResizerLocal = MelonPrefs.GetBool(settingsCategory, dynamicResizerSetting);
             dynamicResDistLocal = MelonPrefs.GetFloat(settingsCategory, dynamicResizerDistance);
+            hideNameplateLocal = MelonPrefs.GetBool(settingsCategory, hideNameplateBorder);
         }
 
         private static void OnAvatarInit(GameObject __0, ref VRCAvatarManager __instance, ref bool __result)

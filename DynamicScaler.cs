@@ -5,23 +5,25 @@ using VRC;
 
 namespace BTKSANameplateMod
 {
-    public class DynamicNameplateScaler : MonoBehaviour
+    public class DynamicScaler : MonoBehaviour
     {
         private Player user;
+        private GameObject scaleTarget;
         private float minSize;
         private float maxSize;
         private float maxDist;
         private float scaleDiff;
 
-        public DynamicNameplateScaler(IntPtr ptr) : base(ptr)
+        public DynamicScaler(IntPtr ptr) : base(ptr)
         {
 
         }
 
         [HideFromIl2Cpp]
-        public void ApplySettings(Player user, float minSize, float maxSize, float maxDist)
+        public void ApplySettings(Player user, GameObject scaleTarget, float minSize, float maxSize, float maxDist)
         {
             this.user = user;
+            this.scaleTarget = scaleTarget;
             this.minSize = minSize;
             this.maxSize = maxSize;
             this.maxDist = maxDist;
@@ -44,7 +46,7 @@ namespace BTKSANameplateMod
                 {
                     float nameplateScale = (scaleDiff * (currentDist / maxDist))+minSize;
                     Vector3 newScale = new Vector3(nameplateScale, nameplateScale, nameplateScale);
-                    user.field_Internal_VRCPlayer_0.field_Private_VRCWorldPlayerUiProfile_0.gameObject.transform.localScale = newScale;
+                    scaleTarget.transform.localScale = newScale;
                 }
             }
         }
