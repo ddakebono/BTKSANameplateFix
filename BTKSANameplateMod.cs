@@ -16,7 +16,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "1.2.0"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "1.2.1"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -55,14 +55,14 @@ namespace BTKSANameplateMod
 
         public override void VRChat_OnUiManagerInit()
         {
-            MelonLogger.Log("BTK Standalone: Nameplate Fix - Starting up");
+            Log("BTK Standalone: Nameplate Fix - Starting up");
 
             instance = this;
 
             if (Directory.Exists("BTKCompanion"))
             {
-                MelonLogger.Log("Woah, hold on a sec, it seems you might be running BTKCompanion, if this is true NameplateFix is built into that, and you should not be using this!");
-                MelonLogger.Log("If you are not currently using BTKCompanion please remove the BTKCompanion folder from your VRChat installation!");
+                Log("Woah, hold on a sec, it seems you might be running BTKCompanion, if this is true NameplateFix is built into that, and you should not be using this!");
+                Log("If you are not currently using BTKCompanion please remove the BTKCompanion folder from your VRChat installation!");
                 MelonLogger.LogError("Nameplate Fix has not started up! (BTKCompanion Exists)");
                 return;
             }
@@ -85,7 +85,7 @@ namespace BTKSANameplateMod
 
             avatarDescriptProperty = typeof(VRCAvatarManager).GetProperty("prop_VRC_AvatarDescriptor_0", BindingFlags.Public | BindingFlags.Instance, null, typeof(VRC_AvatarDescriptor), new Type[0], null);
 
-            MelonLogger.Log("Loading Assets from Embedded Bundle...");
+            Log("Loading Assets from Embedded Bundle...");
             loadAssets();
 
             //Load the settings to the local copy to compare with SettingsApplied
@@ -117,7 +117,7 @@ namespace BTKSANameplateMod
                     ////
 
                     //User is remote, apply fix
-                    MelonLogger.Log($"New user or avatar change! Applying NameplateMod on { user.displayName }");
+                    Log($"New user or avatar change! Applying NameplateMod on { user.displayName }", true);
                     Vector3 npPos = nameplate.transform.position;
                     object avatarDescriptor = avatarDescriptProperty.GetValue(user.vrcPlayer.prop_VRCAvatarManager_0);
                     float viewPointY = 0;
@@ -179,7 +179,7 @@ namespace BTKSANameplateMod
 
                         if (customNameplateObject != null && !customNameplateObject.gameObject.active)
                         {
-                            MelonLogger.Log($"Found hidden Custom Nameplate on { user.displayName }, enabling.");
+                            Log($"Found hidden Custom Nameplate on { user.displayName }, enabling.", true);
                             customNameplateObject.gameObject.SetActive(true);
                         }
                     }
@@ -312,7 +312,7 @@ namespace BTKSANameplateMod
         {
             using (var assetStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("BTKSANameplateMod.assets"))
             {
-                MelonLogger.Log("Loaded Embedded resource");
+                Log("Loaded Embedded resource", true);
                 using (var tempStream = new MemoryStream((int)assetStream.Length))
                 {
                     assetStream.CopyTo(tempStream);
@@ -330,7 +330,7 @@ namespace BTKSANameplateMod
                 tagShader.hideFlags |= HideFlags.DontUnloadUnusedAsset;
             }
 
-            MelonLogger.Log("Loaded Assets Successfully!");
+            Log("Loaded Assets Successfully!", true);
 
         }
 
@@ -355,6 +355,14 @@ namespace BTKSANameplateMod
                 }
             }
 
+        }
+
+        public static void Log(string log, bool dbg = false)
+        {
+            if (!Imports.IsDebugMode() && dbg)
+                return;
+
+            MelonLogger.Log(log);
         }
 
         bool ValidatePlayerAvatar(Player player)
