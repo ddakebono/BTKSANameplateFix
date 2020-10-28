@@ -1,8 +1,12 @@
 ﻿using Harmony;
+using Il2CppSystem.Text;
 using MelonLoader;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using UIExpansionKit.API;
 using UnhollowerRuntimeLib;
 using UnityEngine;
 using VRC;
@@ -16,7 +20,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "1.2.1"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "1.3.0"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -48,6 +52,8 @@ namespace BTKSANameplateMod
         bool dynamicResizerLocal = false;
         float dynamicResDistLocal = 3f;
 
+        List<string> hiddenNameplateUserIDs = new List<string>();
+
         //Assets
         AssetBundle shaderBundle;
         Shader borderShader;
@@ -59,11 +65,10 @@ namespace BTKSANameplateMod
 
             instance = this;
 
-            if (Directory.Exists("BTKCompanion"))
+            if (MelonHandler.Mods.Any(x => x.Info.Name.Equals("BTKCompanionLoader", StringComparison.OrdinalIgnoreCase)))
             {
-                Log("Woah, hold on a sec, it seems you might be running BTKCompanion, if this is true NameplateFix is built into that, and you should not be using this!");
-                Log("If you are not currently using BTKCompanion please remove the BTKCompanion folder from your VRChat installation!");
-                MelonLogger.LogError("Nameplate Fix has not started up! (BTKCompanion Exists)");
+                MelonLogger.Log("Hold on a sec! Looks like you've got BTKCompanion installed, this mod is built in and not needed!");
+                MelonLogger.LogError("BTKSANameplateMod has not started up! (BTKCompanion Running)");
                 return;
             }
 
@@ -79,6 +84,9 @@ namespace BTKSANameplateMod
             ClassInjector.RegisterTypeInIl2Cpp<DynamicScaler>();
             ClassInjector.RegisterTypeInIl2Cpp<DynamicScalerCustom>();
 
+            //Register our menu button
+            ExpansionKitApi.RegisterSimpleMenuButton(ExpandedMenu.UserQuickMenu, "Toggle Nameplate Visibility", ToggleNameplateVisiblity);
+
             //Initalize Harmony
             harmony = HarmonyInstance.Create("BTKStandalone");
             harmony.Patch(typeof(VRCAvatarManager).GetMethod("Method_Private_Boolean_GameObject_String_Single_PDM_0", BindingFlags.Instance | BindingFlags.Public), null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnAvatarInit", BindingFlags.NonPublic | BindingFlags.Static)));
@@ -88,6 +96,8 @@ namespace BTKSANameplateMod
             Log("Loading Assets from Embedded Bundle...");
             loadAssets();
 
+            Log("Loading HiddenNameplateUserIDs from file", true);
+            LoadHiddenNameplateFromFile();
             //Load the settings to the local copy to compare with SettingsApplied
             getPrefsLocal();
         }
@@ -111,6 +121,29 @@ namespace BTKSANameplateMod
                 if (!player.name.Contains("Local"))
                 {
                     GameObject nameplate = user.vrcPlayer.field_Internal_VRCPlayer_0.field_Private_VRCWorldPlayerUiProfile_0.gameObject;
+                    Transform customNameplateObject = user.avatarObject.transform.Find("Custom Nameplate");
+                    Transform tagAndBGObj = null;
+                    Transform borderObj = null;
+
+                    //Reset Nameplate to default state and remove DynamicNameplateScalers
+                    resetNameplate(nameplate, nameplateDefaultSize);
+
+                    //Reset Custom Nameplate scale
+                    if (customNameplateObject != null)
+                    {
+                        tagAndBGObj = customNameplateObject.Find("Tag and Background");
+                        borderObj = customNameplateObject.Find("Border");
+                        resetNameplate(customNameplateObject.gameObject, customNameplateDefaultSize, tagAndBGObj, borderObj);
+                    }
+
+                    //Check if the Nameplate should be hidden
+                    if (hiddenNameplateUserIDs.Contains(player.field_Private_APIUser_0.id))
+                    {
+                        nameplate.transform.localScale = Vector3.zero;
+                        if (customNameplateObject != null)
+                            customNameplateObject.gameObject.SetActive(false);
+                        return;
+                    }
 
                     ////
                     /// Nameplate RNG Fix
@@ -119,7 +152,7 @@ namespace BTKSANameplateMod
                     //User is remote, apply fix
                     Log($"New user or avatar change! Applying NameplateMod on { user.displayName }", true);
                     Vector3 npPos = nameplate.transform.position;
-                    object avatarDescriptor = avatarDescriptProperty.GetValue(user.vrcPlayer.prop_VRCAvatarManager_0);
+                    object avatarDescriptor = avatarDescriptProperty.GetValue(user.vrcPlayer.prop_VRCPlayer_0.prop_VRCAvatarManager_0);
                     float viewPointY = 0;
 
                     //Get viewpoint for AV2 avatar
@@ -127,8 +160,8 @@ namespace BTKSANameplateMod
                         viewPointY = ((VRC_AvatarDescriptor)avatarDescriptor).ViewPosition.y;
 
                     //Get viewpoint for AV3 avatar
-                    if (user.vrcPlayer.prop_VRCAvatarManager_0.prop_VRCAvatarDescriptor_0 != null)
-                        viewPointY = user.vrcPlayer.prop_VRCAvatarManager_0.prop_VRCAvatarDescriptor_0.ViewPosition.y;
+                    if (user.vrcPlayer.prop_VRCPlayer_0.prop_VRCAvatarManager_0.prop_VRCAvatarDescriptor_0 != null)
+                        viewPointY = user.vrcPlayer.prop_VRCPlayer_0.prop_VRCAvatarManager_0.prop_VRCAvatarDescriptor_0.ViewPosition.y;
 
                     if (viewPointY > 0)
                     {
@@ -141,9 +174,6 @@ namespace BTKSANameplateMod
                     ////
 
                     float nameplateScale = (MelonPrefs.GetInt(settingsCategory, nameplateScaleSetting) / 100f) * 0.0015f;
-
-                    //Reset Nameplate to default state and remove DynamicNameplateScalers
-                    resetNameplate(nameplate, nameplateDefaultSize);
 
                     //Disable nameplates on friends
                     if (MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates))
@@ -166,12 +196,7 @@ namespace BTKSANameplateMod
                     ////
 
                     //Grab custom nameplate object for next 2 checks
-                    Transform customNameplateObject = user.avatarObject.transform.Find("Custom Nameplate");
                     float customNameplateScale = (MelonPrefs.GetInt(settingsCategory, nameplateScaleSetting) / 100f) * 1.0f;
-
-                    //Reset Custom Nameplate scale
-                    if (customNameplateObject != null)
-                        resetNameplate(customNameplateObject.gameObject, customNameplateDefaultSize);
 
                     //Enable Hidden Custom Nameplate
                     if (MelonPrefs.GetBool(settingsCategory, hiddenCustomSetting) && !(MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates) && friend))
@@ -189,9 +214,6 @@ namespace BTKSANameplateMod
                     {
                         if (MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates) && friend)
                             customNameplateObject.gameObject.SetActive(false);
-
-                        Transform tagAndBGObj = customNameplateObject.Find("Tag and Background");
-                        Transform borderObj = customNameplateObject.Find("Border");
 
                         if (tagAndBGObj != null && borderObj != null)
                         {
@@ -291,9 +313,14 @@ namespace BTKSANameplateMod
             }
         }
 
-        private void resetNameplate(GameObject nameplate, float defaultSize)
+        private void resetNameplate(GameObject nameplate, float defaultSize, Transform tagObj = null, Transform borderObj = null)
         {
             foreach (DynamicScaler scaler in nameplate.GetComponents<DynamicScaler>())
+            {
+                GameObject.Destroy(scaler);
+            }
+
+            foreach(DynamicScalerCustom scaler in nameplate.GetComponents<DynamicScalerCustom>())
             {
                 GameObject.Destroy(scaler);
             }
@@ -305,6 +332,18 @@ namespace BTKSANameplateMod
             if (border != null)
             {
                 border.gameObject.active = true;
+            }
+
+            if (tagObj != null)
+            {
+                SkinnedMeshRenderer tagRenderer = tagObj.gameObject.GetComponent<SkinnedMeshRenderer>();
+                tagRenderer.material.SetFloat("_Scale", defaultSize);
+            }
+
+            if(borderObj != null)
+            {
+                SkinnedMeshRenderer borderRenderer = borderObj.gameObject.GetComponent<SkinnedMeshRenderer>();
+                borderRenderer.material.SetFloat("_Scale", defaultSize);
             }
         }
 
@@ -331,7 +370,44 @@ namespace BTKSANameplateMod
             }
 
             Log("Loaded Assets Successfully!", true);
+        }
 
+        private void ToggleNameplateVisiblity()
+        {
+            if(!hiddenNameplateUserIDs.Contains(QuickMenu.prop_QuickMenu_0.field_Private_APIUser_0.id))
+                hiddenNameplateUserIDs.Add(QuickMenu.prop_QuickMenu_0.field_Private_APIUser_0.id);
+            else
+                hiddenNameplateUserIDs.Remove(QuickMenu.prop_QuickMenu_0.field_Private_APIUser_0.id);
+
+            SaveHiddenNameplateFile();
+            OnUpdatePlayer(getPlayerFromPlayerlist(QuickMenu.prop_QuickMenu_0.field_Private_APIUser_0.id));
+        }
+
+        private void SaveHiddenNameplateFile()
+        {
+            StringBuilder builder = new StringBuilder();
+            foreach(string id in hiddenNameplateUserIDs)
+            {
+                builder.Append(id);
+                builder.AppendLine();
+            }
+            File.WriteAllText("UserData\\BTKHiddenNameplates.txt", builder.ToString());
+        }
+
+        private void LoadHiddenNameplateFromFile()
+        {
+            if (File.Exists("UserData\\BTKHiddenNameplates.txt"))
+            {
+                hiddenNameplateUserIDs.Clear();
+
+                string[] lines = File.ReadAllLines("UserData\\BTKHiddenNameplates.txt");
+
+                foreach (string line in lines)
+                {
+                    if (!String.IsNullOrWhiteSpace(line))
+                        hiddenNameplateUserIDs.Add(line);
+                }
+            }
         }
 
         private void getPrefsLocal()
@@ -363,6 +439,19 @@ namespace BTKSANameplateMod
                 return;
 
             MelonLogger.Log(log);
+        }
+
+        public static Player getPlayerFromPlayerlist(string userID)
+        {
+            foreach (var player in PlayerManager.field_Private_Static_PlayerManager_0.field_Private_List_1_Player_0)
+            {
+                if (player.field_Private_APIUser_0 != null)
+                {
+                    if (player.field_Private_APIUser_0.id.Equals(userID))
+                        return player;
+                }
+            }
+            return null;
         }
 
         bool ValidatePlayerAvatar(Player player)
