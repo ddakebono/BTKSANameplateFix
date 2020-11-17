@@ -20,7 +20,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "1.3.0"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "1.3.1"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -32,6 +32,7 @@ namespace BTKSANameplateMod
 
         public float nameplateDefaultSize = 0.0015f;
         public float customNameplateDefaultSize = 1.0f;
+        public bool isInit = false;
 
         private string settingsCategory = "BTKSANameplateFix";
         private string hiddenCustomSetting = "enableHiddenCustomNameplates";
@@ -48,9 +49,11 @@ namespace BTKSANameplateMod
         bool hiddenCustomLocal = false;
         bool hideFriendsLocal = false;
         bool hideNameplateLocal = false;
+        bool nameplateVisiblityQM = true;
         int scaleLocal = 100;
         bool dynamicResizerLocal = false;
         float dynamicResDistLocal = 3f;
+
 
         List<string> hiddenNameplateUserIDs = new List<string>();
 
@@ -85,11 +88,13 @@ namespace BTKSANameplateMod
             ClassInjector.RegisterTypeInIl2Cpp<DynamicScalerCustom>();
 
             //Register our menu button
-            ExpansionKitApi.RegisterSimpleMenuButton(ExpandedMenu.UserQuickMenu, "Toggle Nameplate Visibility", ToggleNameplateVisiblity);
+            if(MelonHandler.Mods.Any(x => x.Info.Name.Equals("UI Expansion Kit", StringComparison.OrdinalIgnoreCase)))
+                ExpansionKitApi.RegisterSimpleMenuButton(ExpandedMenu.UserQuickMenu, "Toggle Nameplate Visibility", ToggleNameplateVisiblity);
 
             //Initalize Harmony
             harmony = HarmonyInstance.Create("BTKStandalone");
-            harmony.Patch(typeof(VRCAvatarManager).GetMethod("Method_Private_Boolean_GameObject_String_Single_PDM_0", BindingFlags.Instance | BindingFlags.Public), null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnAvatarInit", BindingFlags.NonPublic | BindingFlags.Static)));
+
+            harmony.Patch(typeof(VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique).GetMethod("Invoke", BindingFlags.Public | BindingFlags.Instance), null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnAvatarInit", BindingFlags.NonPublic | BindingFlags.Static)));
 
             avatarDescriptProperty = typeof(VRCAvatarManager).GetProperty("prop_VRC_AvatarDescriptor_0", BindingFlags.Public | BindingFlags.Instance, null, typeof(VRC_AvatarDescriptor), new Type[0], null);
 
@@ -102,6 +107,7 @@ namespace BTKSANameplateMod
             getPrefsLocal();
         }
 
+
         public override void OnModSettingsApplied()
         {
             if (hiddenCustomLocal != MelonPrefs.GetBool(settingsCategory, hiddenCustomSetting) || hideFriendsLocal != MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates) || scaleLocal != MelonPrefs.GetInt(settingsCategory, nameplateScaleSetting) || dynamicResizerLocal != MelonPrefs.GetBool(settingsCategory, dynamicResizerSetting) || dynamicResDistLocal != MelonPrefs.GetFloat(settingsCategory, dynamicResizerDistance) || hideNameplateLocal != MelonPrefs.GetBool(settingsCategory, hideNameplateBorder))
@@ -110,12 +116,17 @@ namespace BTKSANameplateMod
             getPrefsLocal();
         }
 
+        /*public override void OnUpdate()
+        {
+            if(QuickMenu.field_Private_Static_Boolean_0)
+        }*/
+
         public void OnUpdatePlayer(Player player)
         {
-
-
             if (ValidatePlayerAvatar(player))
             {
+                Log($"VRCPlayer is {player.field_Internal_VRCPlayer_0!=null}", false);
+
                 GDBUser user = new GDBUser(player, player.field_Private_APIUser_0.id);
                 bool friend = false;
                 if (!player.name.Contains("Local"))
@@ -420,17 +431,29 @@ namespace BTKSANameplateMod
             hideNameplateLocal = MelonPrefs.GetBool(settingsCategory, hideNameplateBorder);
         }
 
-        private static void OnAvatarInit(GameObject __0, ref VRCAvatarManager __instance, ref bool __result)
+        private static void OnAvatarInit(GameObject __0, VRC_AvatarDescriptor __1, bool __2)
         {
-            if (__instance.field_Private_VRCPlayer_0.field_Private_Player_0 != null)
-            {
-                if (__instance.field_Private_VRCPlayer_0.field_Private_Player_0.field_Private_APIUser_0 != null)
-                {
-                    //User changed avatar, send to GDBManager for processing
-                    BTKSANameplateMod.instance.OnUpdatePlayer(__instance.field_Private_VRCPlayer_0.field_Private_Player_0);
-                }
-            }
+            //Return if bool is false (dunno what it is but it's bad?)
+            if (!__2)
+                return;
 
+            foreach (Player player in PlayerManager.field_Private_Static_PlayerManager_0.field_Private_List_1_Player_0)
+            {
+                VRCPlayer vrcPlayer = player.field_Internal_VRCPlayer_0;
+                if (vrcPlayer == null)
+                    continue;
+
+                VRCAvatarManager vrcAM = vrcPlayer.prop_VRCAvatarManager_0;
+                if (vrcAM == null)
+                    continue;
+
+                VRC_AvatarDescriptor descriptor = vrcAM.prop_VRC_AvatarDescriptor_0;
+                if ((descriptor == null) || (descriptor != __1))
+                    continue;
+
+                BTKSANameplateMod.instance.OnUpdatePlayer(player);
+                break;
+            }
         }
 
         public static void Log(string log, bool dbg = false)
