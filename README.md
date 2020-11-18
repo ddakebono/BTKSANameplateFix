@@ -20,7 +20,7 @@ Here's a brief overview of the settings you'll find:
 If you encounter issues with this mod, feel free to contact me on Discord (DDAkebono#0001)!
 
 ## Install/Usage
-Install [MelonLoader](https://github.com/HerpDerpinstine/MelonLoader) version 0.2.0 or higher, the mod should work fine with anything 0.2.x.
+Install [MelonLoader](https://github.com/HerpDerpinstine/MelonLoader) version 0.2.7.x or higher
 
 Download the latest release from [Releases](https://github.com/ddakebono/BTKSANameplateFix/releases) and place in your VRChat\Mods folder.
 
@@ -46,6 +46,7 @@ Note that this is only LOCAL, so if you set it up on your avatar others using th
 ## Credits
 * [KageDev/VRCDynamicBones](https://github.com/KageDev/VRCDynamicBones)
 * [HerpDerpinstine/MelonLoader](https://github.com/HerpDerpinstine/MelonLoader)
+* Psychloor for the XrefScannerUtils class
 
 
 

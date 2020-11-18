@@ -49,7 +49,6 @@ namespace BTKSANameplateMod
         bool hiddenCustomLocal = false;
         bool hideFriendsLocal = false;
         bool hideNameplateLocal = false;
-        bool nameplateVisiblityQM = true;
         int scaleLocal = 100;
         bool dynamicResizerLocal = false;
         float dynamicResDistLocal = 3f;
@@ -64,7 +63,7 @@ namespace BTKSANameplateMod
 
         public override void VRChat_OnUiManagerInit()
         {
-            Log("BTK Standalone: Nameplate Fix - Starting up");
+            Log("BTK Standalone: Nameplate Mod - Starting up");
 
             instance = this;
 
@@ -94,7 +93,15 @@ namespace BTKSANameplateMod
             //Initalize Harmony
             harmony = HarmonyInstance.Create("BTKStandalone");
 
-            harmony.Patch(typeof(VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique).GetMethod("Invoke", BindingFlags.Public | BindingFlags.Instance), null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnAvatarInit", BindingFlags.NonPublic | BindingFlags.Static)));
+            foreach(MethodInfo method in typeof(VRCPlayer).GetMethods(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if(method.XRefScanForGlobal("Avatar is ready, Initializing"))
+                {
+                    Log($"Target method found {method.Name}", true);
+                    harmony.Patch(method, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnAvatarInit", BindingFlags.NonPublic | BindingFlags.Static)));
+                    break;
+                }
+            }
 
             avatarDescriptProperty = typeof(VRCAvatarManager).GetProperty("prop_VRC_AvatarDescriptor_0", BindingFlags.Public | BindingFlags.Instance, null, typeof(VRC_AvatarDescriptor), new Type[0], null);
 
@@ -115,11 +122,6 @@ namespace BTKSANameplateMod
 
             getPrefsLocal();
         }
-
-        /*public override void OnUpdate()
-        {
-            if(QuickMenu.field_Private_Static_Boolean_0)
-        }*/
 
         public void OnUpdatePlayer(Player player)
         {
@@ -433,10 +435,6 @@ namespace BTKSANameplateMod
 
         private static void OnAvatarInit(GameObject __0, VRC_AvatarDescriptor __1, bool __2)
         {
-            //Return if bool is false (dunno what it is but it's bad?)
-            if (!__2)
-                return;
-
             foreach (Player player in PlayerManager.field_Private_Static_PlayerManager_0.field_Private_List_1_Player_0)
             {
                 VRCPlayer vrcPlayer = player.field_Internal_VRCPlayer_0;
