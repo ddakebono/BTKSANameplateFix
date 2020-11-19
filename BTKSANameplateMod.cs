@@ -20,7 +20,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "1.3.1"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "1.3.2"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -93,15 +93,7 @@ namespace BTKSANameplateMod
             //Initalize Harmony
             harmony = HarmonyInstance.Create("BTKStandalone");
 
-            foreach(MethodInfo method in typeof(VRCPlayer).GetMethods(BindingFlags.Public | BindingFlags.Instance))
-            {
-                if(method.XRefScanForGlobal("Avatar is ready, Initializing"))
-                {
-                    Log($"Target method found {method.Name}", true);
-                    harmony.Patch(method, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnAvatarInit", BindingFlags.NonPublic | BindingFlags.Static)));
-                    break;
-                }
-            }
+            harmony.Patch(typeof(VRCAvatarManager).GetMethod("Awake", BindingFlags.Public | BindingFlags.Instance), null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnVRCAMAwake", BindingFlags.NonPublic | BindingFlags.Static)));
 
             avatarDescriptProperty = typeof(VRCAvatarManager).GetProperty("prop_VRC_AvatarDescriptor_0", BindingFlags.Public | BindingFlags.Instance, null, typeof(VRC_AvatarDescriptor), new Type[0], null);
 
@@ -127,9 +119,9 @@ namespace BTKSANameplateMod
         {
             if (ValidatePlayerAvatar(player))
             {
-                Log($"VRCPlayer is {player.field_Internal_VRCPlayer_0!=null}", false);
+                Log($"VRCPlayer is {player.field_Internal_VRCPlayer_0!=null}", true);
 
-                GDBUser user = new GDBUser(player, player.field_Private_APIUser_0.id);
+                GDBUser user = new GDBUser(player);
                 bool friend = false;
                 if (!player.name.Contains("Local"))
                 {
@@ -163,7 +155,7 @@ namespace BTKSANameplateMod
                     ////
 
                     //User is remote, apply fix
-                    Log($"New user or avatar change! Applying NameplateMod on { user.displayName }", true);
+                    Log($"New user or avatar change! Applying NameplateMod on { player.name }", true);
                     Vector3 npPos = nameplate.transform.position;
                     object avatarDescriptor = avatarDescriptProperty.GetValue(user.vrcPlayer.prop_VRCPlayer_0.prop_VRCAvatarManager_0);
                     float viewPointY = 0;
@@ -217,7 +209,7 @@ namespace BTKSANameplateMod
 
                         if (customNameplateObject != null && !customNameplateObject.gameObject.active)
                         {
-                            Log($"Found hidden Custom Nameplate on { user.displayName }, enabling.", true);
+                            Log($"Found hidden Custom Nameplate on { player.name }, enabling.", true);
                             customNameplateObject.gameObject.SetActive(true);
                         }
                     }
@@ -433,24 +425,47 @@ namespace BTKSANameplateMod
             hideNameplateLocal = MelonPrefs.GetBool(settingsCategory, hideNameplateBorder);
         }
 
-        private static void OnAvatarInit(GameObject __0, VRC_AvatarDescriptor __1, bool __2)
+        private static void OnVRCAMAwake(VRCAvatarManager __instance)
         {
-            foreach (Player player in PlayerManager.field_Private_Static_PlayerManager_0.field_Private_List_1_Player_0)
+            Log("Detected new AvatarManager, setting up delegate", true);
+
+            var d = __instance.field_Internal_MulticastDelegateNPublicSealedVoGaVRBoUnique_0;
+            VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique converted = new Action<GameObject, VRC_AvatarDescriptor, bool>(OnAvatarInit);
+            d = d == null ? converted : Il2CppSystem.Delegate.Combine(d, converted).Cast<VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique>();
+            __instance.field_Internal_MulticastDelegateNPublicSealedVoGaVRBoUnique_0 = d;
+
+            var d1 = __instance.field_Internal_MulticastDelegateNPublicSealedVoGaVRBoUnique_1;
+            VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique converted1 = new Action<GameObject, VRC_AvatarDescriptor, bool>(OnAvatarInit);
+            d1 = d1 == null ? converted : Il2CppSystem.Delegate.Combine(d1, converted1).Cast<VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique>();
+            __instance.field_Internal_MulticastDelegateNPublicSealedVoGaVRBoUnique_1 = d;
+
+            Log("Finished setup", true);
+
+        }
+
+        public static void OnAvatarInit(GameObject go, VRC_AvatarDescriptor avatarDescriptor, bool state)
+        {
+            Log($"Hit OnAvatarInit ad:{avatarDescriptor!=null} state:{state}", true);
+
+            if (avatarDescriptor != null)
             {
-                VRCPlayer vrcPlayer = player.field_Internal_VRCPlayer_0;
-                if (vrcPlayer == null)
-                    continue;
+                foreach (Player player in PlayerManager.field_Private_Static_PlayerManager_0.field_Private_List_1_Player_0)
+                {
+                    VRCPlayer vrcPlayer = player.field_Internal_VRCPlayer_0;
+                    if (vrcPlayer == null)
+                        continue;
 
-                VRCAvatarManager vrcAM = vrcPlayer.prop_VRCAvatarManager_0;
-                if (vrcAM == null)
-                    continue;
+                    VRCAvatarManager vrcAM = vrcPlayer.prop_VRCAvatarManager_0;
+                    if (vrcAM == null)
+                        continue;
 
-                VRC_AvatarDescriptor descriptor = vrcAM.prop_VRC_AvatarDescriptor_0;
-                if ((descriptor == null) || (descriptor != __1))
-                    continue;
+                    VRC_AvatarDescriptor descriptor = vrcAM.prop_VRC_AvatarDescriptor_0;
+                    if ((descriptor == null) || (descriptor != avatarDescriptor))
+                        continue;
 
-                BTKSANameplateMod.instance.OnUpdatePlayer(player);
-                break;
+                    BTKSANameplateMod.instance.OnUpdatePlayer(player);
+                    break;
+                }
             }
         }
 

@@ -11,13 +11,11 @@ namespace BTKSANameplateMod
     public class GDBUser
     {
         public Player vrcPlayer;
-        public string displayName;
         public GameObject avatarObject;
 
-        public GDBUser(Player vrcPlayer, string displayName)
+        public GDBUser(Player vrcPlayer)
         {
             this.vrcPlayer = vrcPlayer;
-            this.displayName = displayName;
             this.avatarObject = vrcPlayer.field_Internal_VRCPlayer_0.field_Internal_GameObject_0;
         }
     }
