@@ -20,7 +20,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "1.3.2"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "1.3.3"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -93,7 +93,15 @@ namespace BTKSANameplateMod
             //Initalize Harmony
             harmony = HarmonyInstance.Create("BTKStandalone");
 
-            harmony.Patch(typeof(VRCAvatarManager).GetMethod("Awake", BindingFlags.Public | BindingFlags.Instance), null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnVRCAMAwake", BindingFlags.NonPublic | BindingFlags.Static)));
+            foreach (MethodInfo method in typeof(VRCPlayer).GetMethods(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (method.XRefScanForGlobal("Avatar is ready, Initializing"))
+                {
+                    Log($"Target method found {method.Name}", true);
+                    harmony.Patch(method, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnAvatarInit", BindingFlags.Public | BindingFlags.Static)));
+                    break;
+                }
+            }
 
             avatarDescriptProperty = typeof(VRCAvatarManager).GetProperty("prop_VRC_AvatarDescriptor_0", BindingFlags.Public | BindingFlags.Instance, null, typeof(VRC_AvatarDescriptor), new Type[0], null);
 
@@ -125,6 +133,9 @@ namespace BTKSANameplateMod
                 bool friend = false;
                 if (!player.name.Contains("Local"))
                 {
+                    if (user.vrcPlayer.field_Internal_VRCPlayer_0.field_Private_VRCWorldPlayerUiProfile_0 == null)
+                        return;
+
                     GameObject nameplate = user.vrcPlayer.field_Internal_VRCPlayer_0.field_Private_VRCWorldPlayerUiProfile_0.gameObject;
                     Transform customNameplateObject = user.avatarObject.transform.Find("Custom Nameplate");
                     Transform tagAndBGObj = null;
@@ -141,13 +152,16 @@ namespace BTKSANameplateMod
                         resetNameplate(customNameplateObject.gameObject, customNameplateDefaultSize, tagAndBGObj, borderObj);
                     }
 
-                    //Check if the Nameplate should be hidden
-                    if (hiddenNameplateUserIDs.Contains(player.field_Private_APIUser_0.id))
+                    if (player.field_Private_APIUser_0 != null)
                     {
-                        nameplate.transform.localScale = Vector3.zero;
-                        if (customNameplateObject != null)
-                            customNameplateObject.gameObject.SetActive(false);
-                        return;
+                        //Check if the Nameplate should be hidden
+                        if (hiddenNameplateUserIDs.Contains(player.field_Private_APIUser_0.id))
+                        {
+                            nameplate.transform.localScale = Vector3.zero;
+                            if (customNameplateObject != null)
+                                customNameplateObject.gameObject.SetActive(false);
+                            return;
+                        }
                     }
 
                     ////
@@ -183,12 +197,14 @@ namespace BTKSANameplateMod
                     //Disable nameplates on friends
                     if (MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates))
                     {
-
-                        if (APIUser.IsFriendsWith(user.vrcPlayer.field_Private_APIUser_0.id))
+                        if (player.field_Private_APIUser_0 != null)
                         {
-                            Vector3 newScale = new Vector3(0, 0, 0);
-                            nameplate.transform.localScale = newScale;
-                            friend = true;
+                            if (APIUser.IsFriendsWith(player.field_Private_APIUser_0.id))
+                            {
+                                Vector3 newScale = new Vector3(0, 0, 0);
+                                nameplate.transform.localScale = newScale;
+                                friend = true;
+                            }
                         }
                     }
 
@@ -425,29 +441,11 @@ namespace BTKSANameplateMod
             hideNameplateLocal = MelonPrefs.GetBool(settingsCategory, hideNameplateBorder);
         }
 
-        private static void OnVRCAMAwake(VRCAvatarManager __instance)
+        public static void OnAvatarInit(GameObject __0, VRC_AvatarDescriptor __1, bool __2)
         {
-            Log("Detected new AvatarManager, setting up delegate", true);
+            Log($"Hit OnAvatarInit ad:{__1 != null} state:{__2}", true);
 
-            var d = __instance.field_Internal_MulticastDelegateNPublicSealedVoGaVRBoUnique_0;
-            VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique converted = new Action<GameObject, VRC_AvatarDescriptor, bool>(OnAvatarInit);
-            d = d == null ? converted : Il2CppSystem.Delegate.Combine(d, converted).Cast<VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique>();
-            __instance.field_Internal_MulticastDelegateNPublicSealedVoGaVRBoUnique_0 = d;
-
-            var d1 = __instance.field_Internal_MulticastDelegateNPublicSealedVoGaVRBoUnique_1;
-            VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique converted1 = new Action<GameObject, VRC_AvatarDescriptor, bool>(OnAvatarInit);
-            d1 = d1 == null ? converted : Il2CppSystem.Delegate.Combine(d1, converted1).Cast<VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique>();
-            __instance.field_Internal_MulticastDelegateNPublicSealedVoGaVRBoUnique_1 = d;
-
-            Log("Finished setup", true);
-
-        }
-
-        public static void OnAvatarInit(GameObject go, VRC_AvatarDescriptor avatarDescriptor, bool state)
-        {
-            Log($"Hit OnAvatarInit ad:{avatarDescriptor!=null} state:{state}", true);
-
-            if (avatarDescriptor != null)
+            if (__1 != null)
             {
                 foreach (Player player in PlayerManager.field_Private_Static_PlayerManager_0.field_Private_List_1_Player_0)
                 {
@@ -460,7 +458,7 @@ namespace BTKSANameplateMod
                         continue;
 
                     VRC_AvatarDescriptor descriptor = vrcAM.prop_VRC_AvatarDescriptor_0;
-                    if ((descriptor == null) || (descriptor != avatarDescriptor))
+                    if ((descriptor == null) || (descriptor != __1))
                         continue;
 
                     BTKSANameplateMod.instance.OnUpdatePlayer(player);
