@@ -93,15 +93,7 @@ namespace BTKSANameplateMod
             //Initalize Harmony
             harmony = HarmonyInstance.Create("BTKStandalone");
 
-            foreach (MethodInfo method in typeof(VRCPlayer).GetMethods(BindingFlags.Public | BindingFlags.Instance))
-            {
-                if (method.XRefScanForGlobal("Avatar is ready, Initializing"))
-                {
-                    Log($"Target method found {method.Name}", true);
-                    harmony.Patch(method, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnAvatarInit", BindingFlags.Public | BindingFlags.Static)));
-                    break;
-                }
-            }
+            harmony.Patch(typeof(VRCAvatarManager).GetMethod("Awake", BindingFlags.Public | BindingFlags.Instance), null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnVRCAMAwake", BindingFlags.NonPublic | BindingFlags.Static)));
 
             avatarDescriptProperty = typeof(VRCAvatarManager).GetProperty("prop_VRC_AvatarDescriptor_0", BindingFlags.Public | BindingFlags.Instance, null, typeof(VRC_AvatarDescriptor), new Type[0], null);
 
@@ -441,11 +433,29 @@ namespace BTKSANameplateMod
             hideNameplateLocal = MelonPrefs.GetBool(settingsCategory, hideNameplateBorder);
         }
 
-        public static void OnAvatarInit(GameObject __0, VRC_AvatarDescriptor __1, bool __2)
+        private static void OnVRCAMAwake(VRCAvatarManager __instance)
         {
-            Log($"Hit OnAvatarInit ad:{__1 != null} state:{__2}", true);
+            Log("Detected new AvatarManager, setting up delegate", true);
 
-            if (__1 != null)
+            var d = __instance.field_Internal_MulticastDelegateNPublicSealedVoGaVRBoUnique_0;
+            VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique converted = new Action<GameObject, VRC_AvatarDescriptor, bool>(OnAvatarInit);
+            d = d == null ? converted : Il2CppSystem.Delegate.Combine(d, converted).Cast<VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique>();
+            __instance.field_Internal_MulticastDelegateNPublicSealedVoGaVRBoUnique_0 = d;
+
+            var d1 = __instance.field_Internal_MulticastDelegateNPublicSealedVoGaVRBoUnique_1;
+            VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique converted1 = new Action<GameObject, VRC_AvatarDescriptor, bool>(OnAvatarInit);
+            d1 = d1 == null ? converted : Il2CppSystem.Delegate.Combine(d1, converted1).Cast<VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique>();
+            __instance.field_Internal_MulticastDelegateNPublicSealedVoGaVRBoUnique_1 = d;
+
+            Log("Finished setup", true);
+
+        }
+
+        public static void OnAvatarInit(GameObject go, VRC_AvatarDescriptor avatarDescriptor, bool state)
+        {
+            Log($"Hit OnAvatarInit ad:{avatarDescriptor != null} state:{state}", true);
+
+            if (avatarDescriptor != null)
             {
                 foreach (Player player in PlayerManager.field_Private_Static_PlayerManager_0.field_Private_List_1_Player_0)
                 {
@@ -458,7 +468,7 @@ namespace BTKSANameplateMod
                         continue;
 
                     VRC_AvatarDescriptor descriptor = vrcAM.prop_VRC_AvatarDescriptor_0;
-                    if ((descriptor == null) || (descriptor != __1))
+                    if ((descriptor == null) || (descriptor != avatarDescriptor))
                         continue;
 
                     BTKSANameplateMod.instance.OnUpdatePlayer(player);
