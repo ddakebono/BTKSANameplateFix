@@ -444,8 +444,8 @@ namespace BTKSANameplateMod
 
             var d1 = __instance.field_Internal_MulticastDelegateNPublicSealedVoGaVRBoUnique_1;
             VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique converted1 = new Action<GameObject, VRC_AvatarDescriptor, bool>(OnAvatarInit);
-            d1 = d1 == null ? converted : Il2CppSystem.Delegate.Combine(d1, converted1).Cast<VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique>();
-            __instance.field_Internal_MulticastDelegateNPublicSealedVoGaVRBoUnique_1 = d;
+            d1 = d1 == null ? converted1 : Il2CppSystem.Delegate.Combine(d1, converted1).Cast<VRCAvatarManager.MulticastDelegateNPublicSealedVoGaVRBoUnique>();
+            __instance.field_Internal_MulticastDelegateNPublicSealedVoGaVRBoUnique_1 = d1;
 
             Log("Finished setup", true);
 
