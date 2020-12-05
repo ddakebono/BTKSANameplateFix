@@ -64,6 +64,7 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\VRChat\MelonLoader\Managed\UnhollowerRuntimeLib.dll</HintPath>
     </Reference>
+    <Reference Include="Unity.TextMeshPro, Version=3.7.1.6, Culture=neutral, PublicKeyToken=null" />
     <Reference Include="UnityEngine.AnimationModule">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\VRChat\MelonLoader\Managed\UnityEngine.AnimationModule.dll</HintPath>
     </Reference>
@@ -74,6 +75,7 @@
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\VRChat\MelonLoader\Managed\UnityEngine.CoreModule.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.UI, Version=3.7.1.6, Culture=neutral, PublicKeyToken=null" />
     <Reference Include="VRCCore-Standalone">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\VRChat\MelonLoader\Managed\VRCCore-Standalone.dll</HintPath>
     </Reference>
@@ -87,16 +89,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BTKSANameplateMod.cs" />
-    <Compile Include="DynamicScaler.cs" />
-    <Compile Include="DynamicScalerCustom.cs" />
     <Compile Include="GDBUser.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="XrefScannerUtils.cs" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="assets" />
-  </ItemGroup>
-  <ItemGroup>
+    <EmbeddedResource Include="nmasset" />
     <None Include="README.md" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
