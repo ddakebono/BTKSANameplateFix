@@ -37,4 +37,3 @@ using MelonLoader;
 [assembly: AssemblyFileVersion("2.0.0")]
 [assembly: MelonInfo(typeof(BTKSANameplateMod.BTKSANameplateMod), BTKSANameplateMod.BuildInfo.Name, BTKSANameplateMod.BuildInfo.Version, BTKSANameplateMod.BuildInfo.Author, BTKSANameplateMod.BuildInfo.DownloadLink)]
 [assembly: MelonGame("VRChat", "VRChat")]
-[assembly: MelonOptionalDependencies("UIExpansionKit")]

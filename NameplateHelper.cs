@@ -13,8 +13,15 @@ namespace BTKSANameplateMod
     {
 
         private PlayerNameplate nameplate = null;
-        private Texture customIcon = null;
-        private Color nameColour = Color.white;
+        private Color nameColour;
+        private Color nameColour2;
+        private bool setColour;
+        private bool colourLerp;
+
+        //Colour lerp stuff
+        private bool lerpReverse = false;
+        private float lerpValue = 0f;
+        private float lerpTransitionTime = 3f;
 
         public NameplateHelper(IntPtr ptr) : base(ptr)
         {
@@ -28,40 +35,67 @@ namespace BTKSANameplateMod
         }
 
         [HideFromIl2Cpp]
-        public void SetCustomIcon(Texture customIcon)
-        {
-            this.customIcon = customIcon;
-        }
-
-        [HideFromIl2Cpp]
         public void SetNameColour(Color color)
         {
             this.nameColour = color;
+            setColour = true;
+        }
+
+        [HideFromIl2Cpp]
+        public void SetColourLerp(Color color1, Color color2)
+        {
+            this.nameColour = color1;
+            this.nameColour2 = color2;
+
+            setColour = false;
+            colourLerp = true;
+        }
+
+        [HideFromIl2Cpp]
+        public void ResetNameplate()
+        {
+            setColour = false;
+            colourLerp = false;
         }
 
         [HideFromIl2Cpp]
         public void OnRebuild()
         {
-            MelonLogger.Log("NameplateHelper Component Got OnRebuild!");
-
             if (nameplate != null)
             {
-                if (customIcon != null)
-                {
-                    nameplate.uiIconBackground.enabled = true;
-                    nameplate.uiUserImage.enabled = true;
-                    nameplate.uiUserImageContainer.SetActive(true);
-
-                    nameplate.uiUserImage.texture = customIcon;
-                }
-
-                if (nameColour != Color.white)
+                if (setColour)
                 {
                     nameplate.uiName.color = nameColour;
                 }
             }
         }
 
+        public void Update()
+        {
+            //Check if we should be doing the lerp
+            if (colourLerp)
+            {
+                if (!lerpReverse)
+                    lerpValue += Time.deltaTime;
+                else
+                    lerpValue -= Time.deltaTime;
+
+                if(lerpValue >= lerpTransitionTime)
+                {
+                    lerpValue = lerpTransitionTime;
+                    lerpReverse = true;
+                }
+
+                if (lerpValue <= 0)
+                {
+                    lerpValue = 0f;
+                    lerpReverse = false;
+                }
+
+                nameplate.uiName.color = Color.Lerp(nameColour, nameColour2, lerpValue);
+
+            }
+        }
 
     }
 }

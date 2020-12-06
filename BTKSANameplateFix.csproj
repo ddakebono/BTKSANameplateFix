@@ -90,6 +90,7 @@
   <ItemGroup>
     <Compile Include="BTKSANameplateMod.cs" />
     <Compile Include="GDBUser.cs" />
+    <Compile Include="NameplateHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="XrefScannerUtils.cs" />
   </ItemGroup>
