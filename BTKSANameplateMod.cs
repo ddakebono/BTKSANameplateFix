@@ -28,11 +28,7 @@ namespace BTKSANameplateMod
     {
         public static BTKSANameplateMod instance;
 
-        public static PlayerNameplate lastNameplate;
-
         public HarmonyInstance harmony;
-
-        public bool isInit = false;
 
         private string settingsCategory = "BTKSANameplateFix";
         private string hiddenCustomSetting = "enableHiddenCustomNameplates";
