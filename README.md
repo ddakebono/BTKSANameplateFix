@@ -12,7 +12,7 @@ Most features of BTKSANameplateMod are disabled by default, to make use of these
 Here's a brief overview of the settings you'll find:
  - Enable Custom Nameplates : Enables custom nameplate colours setup on avatars, this feature isn't ready yet.
  - Hide Friends Nameplates : Hides nameplates on friends
- - Show Trust Colour : Sets the background on the nameplate to match the trust colours (Works with OGTrustRanks!)
+ - Trust Color Mode : This lets you choose to show the trust colour again, either with the friends color, or just the trust colour itself.
 
 
 If you encounter issues with this mod, feel free to contact me on Discord (DDAkebono#0001)!
