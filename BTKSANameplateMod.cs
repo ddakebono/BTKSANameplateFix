@@ -6,9 +6,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using UIExpansionKit.API;
 using UnhollowerRuntimeLib;
 using UnityEngine;
+using UnityEngine.UI;
 using VRC;
 using VRC.Core;
 using VRC.SDKBase;
@@ -20,7 +22,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "2.1.0"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "2.2.0"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -34,14 +36,21 @@ namespace BTKSANameplateMod
         private string hiddenCustomSetting = "enableHiddenCustomNameplates";
         private string hideFriendsNameplates = "hideFriendsNameplates";
         private string trustColourMode = "trustColourMode";
+        private string nameplateOutlineMode = "nameplateOutline";
+
+        private Regex methodMatchRegex = new Regex("Method_Public_Void_\\d", RegexOptions.Compiled);
 
         //Save prefs copy to compare for ReloadAllAvatars
         bool hiddenCustomLocal = false;
         bool hideFriendsLocal = false;
         string trustColourModeLocal = "off";
+        bool nameplateOutlineModeLocal = false;
+
+        Sprite nameplateBGBackup;
 
         AssetBundle bundle;
         Material npUIMaterial;
+        Sprite nameplateOutline;
 
         List<string> hiddenNameplateUserIDs = new List<string>();
 
@@ -62,7 +71,8 @@ namespace BTKSANameplateMod
             MelonPrefs.RegisterBool(settingsCategory, hiddenCustomSetting, false, "Enable Custom Nameplates (Not ready)");
             MelonPrefs.RegisterBool(settingsCategory, hideFriendsNameplates, false, "Hide Friends Nameplates");
             MelonPrefs.RegisterString(settingsCategory, trustColourMode, "friends", "Trust Colour Mode");
-            ExpansionKitApi.RegisterSettingAsStringEnum(settingsCategory, trustColourMode, new[] { ("off", "Disable Trust Colours"), ("friends", "Trust Colours (with friend colour)"), ("trustonly", "Trust Colours (Ignore friend colour)") });
+            MelonPrefs.RegisterBool(settingsCategory, nameplateOutlineMode, false, "Nameplate Outline Background");
+            ExpansionKitApi.RegisterSettingAsStringEnum(settingsCategory, trustColourMode, new[] { ("off", "Disable Trust Colours"), ("friends", "Trust Colours (with friend colour)"), ("trustonly", "Trust Colours (Ignore friend colour)"), ("trustname", "Trust Colours on Names Only") });
 
             //Register our menu button
             ExpansionKitApi.GetExpandedMenu(ExpandedMenu.UserQuickMenu).AddSimpleButton("Toggle Nameplate Visibility", ToggleNameplateVisiblity);
@@ -72,7 +82,11 @@ namespace BTKSANameplateMod
 
             harmony.Patch(typeof(VRCAvatarManager).GetMethod("Awake", BindingFlags.Public | BindingFlags.Instance), null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnVRCAMAwake", BindingFlags.NonPublic | BindingFlags.Static)));
 
-            harmony.Patch(typeof(PlayerNameplate).GetMethod("Method_Public_Void_0", BindingFlags.Public | BindingFlags.Instance), null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnRebuild", BindingFlags.NonPublic | BindingFlags.Static)));
+            foreach(MethodInfo method in typeof(PlayerNameplate).GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(x => methodMatchRegex.IsMatch(x.Name)))
+            {
+                Log($"Found target Rebuild method ({method.Name})", true);
+                harmony.Patch(method, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnRebuild", BindingFlags.NonPublic | BindingFlags.Static)));
+            }
 
             ClassInjector.RegisterTypeInIl2Cpp<NameplateHelper>();
 
@@ -88,7 +102,7 @@ namespace BTKSANameplateMod
 
         public override void OnModSettingsApplied()
         {
-            if (hiddenCustomLocal != MelonPrefs.GetBool(settingsCategory, hiddenCustomSetting) || trustColourModeLocal != MelonPrefs.GetString(settingsCategory, trustColourMode) || hideFriendsLocal != MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates))
+            if (hiddenCustomLocal != MelonPrefs.GetBool(settingsCategory, hiddenCustomSetting) || trustColourModeLocal != MelonPrefs.GetString(settingsCategory, trustColourMode) || hideFriendsLocal != MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates) || nameplateOutlineModeLocal != MelonPrefs.GetBool(settingsCategory, nameplateOutlineMode))
                 VRCPlayer.field_Internal_Static_VRCPlayer_0.Method_Public_Void_Boolean_0();
 
             getPrefsLocal();
@@ -114,6 +128,19 @@ namespace BTKSANameplateMod
                     ////
                     ///
 
+                    //Check if we should replace the background with outline
+                    if (nameplateOutlineModeLocal)
+                    {
+                        ImageThreeSlice bgImage = nameplate.uiNameBackground.GetComponent<ImageThreeSlice>();
+                        if (bgImage != null)
+                        {
+                            if (nameplateBGBackup == null)
+                                nameplateBGBackup = bgImage._sprite;
+
+                            bgImage._sprite = nameplateOutline;
+                        }
+                    }
+
                     //Check if the Nameplate should be hidden
                     if (hiddenNameplateUserIDs.Contains(player.field_Private_APIUser_0.id))
                     {
@@ -122,19 +149,22 @@ namespace BTKSANameplateMod
                         return;
                     }
 
+                    //Trust colour replacer
                     if (!trustColourModeLocal.Equals("off"))
                     {
                         APIUser apiUser = player.field_Private_APIUser_0;
 
-                        Color trustColor;
+                        Color? trustColor = null;
                         Color? textColor = null;
+                        bool resetMaterials = false;
 
                         if (trustColourModeLocal.Equals("friends"))
                         {
                             trustColor = VRCPlayer.Method_Public_Static_Color_APIUser_0(apiUser);
                             textColor = Color.white;
                         }
-                        else
+                        
+                        if(trustColourModeLocal.Equals("trustonly"))
                         {
                             //Setup fake user
                             APIUser fakeUser = apiUser.MemberwiseClone().Cast<APIUser>();
@@ -145,11 +175,18 @@ namespace BTKSANameplateMod
                             trustColor = VRCPlayer.Method_Public_Static_Color_APIUser_0(fakeUser);
                         }
 
+                        if (trustColourModeLocal.Equals("trustname"))
+                        {
+                            textColor = VRCPlayer.Method_Public_Static_Color_APIUser_0(apiUser);
+                            resetMaterials = true;
+                        }
+
                         Log("Setting nameplate colour", true);
 
-                        ApplyNameplateColour(nameplate, trustColor, trustColor, textColor);
+                        ApplyNameplateColour(nameplate, trustColor, trustColor, textColor, null, resetMaterials);
                     }
 
+                    //Jank custom colour system that isn't done
                     if (hiddenCustomLocal)
                     {
 
@@ -233,6 +270,16 @@ namespace BTKSANameplateMod
             if (helper != null)
             {
                 helper.ResetNameplate();
+            }
+
+            //Outline mode was enabled at some point so let's make sure to reset it
+            if (nameplateBGBackup != null)
+            {
+                ImageThreeSlice bgImage = nameplate.uiNameBackground.GetComponent<ImageThreeSlice>();
+                if (bgImage != null)
+                {
+                    bgImage._sprite = nameplateBGBackup;
+                }
             }
 
             ApplyNameplateColour(nameplate, Color.white, Color.white, null, null, true);
@@ -373,6 +420,7 @@ namespace BTKSANameplateMod
             hiddenCustomLocal = MelonPrefs.GetBool(settingsCategory, hiddenCustomSetting);
             hideFriendsLocal = MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates);
             trustColourModeLocal = MelonPrefs.GetString(settingsCategory, trustColourMode);
+            nameplateOutlineModeLocal = MelonPrefs.GetBool(settingsCategory, nameplateOutlineMode);
         }
 
         private void loadAssets()
@@ -393,6 +441,8 @@ namespace BTKSANameplateMod
             {
                 npUIMaterial = bundle.LoadAsset_Internal("NameplateMat", Il2CppType.Of<Material>()).Cast<Material>();
                 npUIMaterial.hideFlags |= HideFlags.DontUnloadUnusedAsset;
+                nameplateOutline = bundle.LoadAsset_Internal("NameplateOutline", Il2CppType.Of<Sprite>()).Cast<Sprite>();
+                nameplateOutline.hideFlags |= HideFlags.DontUnloadUnusedAsset;
             }
         }
 
