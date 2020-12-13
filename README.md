@@ -6,13 +6,15 @@ The main features of this mod are:
  - Hide nameplates on friends only
  - Toggle nameplate visibility on a per user basis (In QuickMenu user details)
  - Enable custom nameplates (Not really ready yet)
+ - Make the nameplate background an outline
 
 Most features of BTKSANameplateMod are disabled by default, to make use of these features I recommend you install [UIExpansionKit](https://github.com/knah/VRCMods).
 
 Here's a brief overview of the settings you'll find:
  - Enable Custom Nameplates : Enables custom nameplate colours setup on avatars, this feature isn't ready yet.
  - Hide Friends Nameplates : Hides nameplates on friends
- - Trust Color Mode : This lets you choose to show the trust colour again, either with the friends color, or just the trust colour itself.
+ - Trust Color Mode : This lets you choose to show the trust colour again, either with the friends color, just the trust colour itself, or show the trust colour on the name text.
+ - Nameplate Outline Background : Changes the background to be an outline instead of solid
 
 
 If you encounter issues with this mod, feel free to contact me on Discord (DDAkebono#0001)!
