@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using TMPro;
 using UIExpansionKit.API;
 using UnhollowerRuntimeLib;
 using UnityEngine;
@@ -22,12 +23,14 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "2.2.0"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "2.2.1"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
     public class BTKSANameplateMod : MelonMod
     {
+        #region Variables
+
         public static BTKSANameplateMod instance;
 
         public HarmonyInstance harmony;
@@ -54,6 +57,8 @@ namespace BTKSANameplateMod
 
         List<string> hiddenNameplateUserIDs = new List<string>();
 
+        #endregion
+
         public override void VRChat_OnUiManagerInit()
         {
             Log("BTK Standalone: Nameplate Mod - Starting up");
@@ -62,16 +67,16 @@ namespace BTKSANameplateMod
 
             if (MelonHandler.Mods.Any(x => x.Info.Name.Equals("BTKCompanionLoader", StringComparison.OrdinalIgnoreCase)))
             {
-                MelonLogger.Log("Hold on a sec! Looks like you've got BTKCompanion installed, this mod is built in and not needed!");
-                MelonLogger.LogError("BTKSANameplateMod has not started up! (BTKCompanion Running)");
+                MelonLogger.Msg("Hold on a sec! Looks like you've got BTKCompanion installed, this mod is built in and not needed!");
+                MelonLogger.Error("BTKSANameplateMod has not started up! (BTKCompanion Running)");
                 return;
             }
 
-            MelonPrefs.RegisterCategory(settingsCategory, "Nameplate Mod");
-            MelonPrefs.RegisterBool(settingsCategory, hiddenCustomSetting, false, "Enable Custom Nameplates (Not ready)");
-            MelonPrefs.RegisterBool(settingsCategory, hideFriendsNameplates, false, "Hide Friends Nameplates");
-            MelonPrefs.RegisterString(settingsCategory, trustColourMode, "friends", "Trust Colour Mode");
-            MelonPrefs.RegisterBool(settingsCategory, nameplateOutlineMode, false, "Nameplate Outline Background");
+            MelonPreferences.CreateCategory(settingsCategory, "Nameplate Mod");
+            MelonPreferences.CreateEntry<bool>(settingsCategory, hiddenCustomSetting, false, "Enable Custom Nameplates (Not ready)");
+            MelonPreferences.CreateEntry<bool>(settingsCategory, hideFriendsNameplates, false, "Hide Friends Nameplates");
+            MelonPreferences.CreateEntry<string>(settingsCategory, trustColourMode, "friends", "Trust Colour Mode");
+            MelonPreferences.CreateEntry<bool>(settingsCategory, nameplateOutlineMode, false, "Nameplate Outline Background");
             ExpansionKitApi.RegisterSettingAsStringEnum(settingsCategory, trustColourMode, new[] { ("off", "Disable Trust Colours"), ("friends", "Trust Colours (with friend colour)"), ("trustonly", "Trust Colours (Ignore friend colour)"), ("trustname", "Trust Colours on Names Only") });
 
             //Register our menu button
@@ -82,7 +87,7 @@ namespace BTKSANameplateMod
 
             harmony.Patch(typeof(VRCAvatarManager).GetMethod("Awake", BindingFlags.Public | BindingFlags.Instance), null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnVRCAMAwake", BindingFlags.NonPublic | BindingFlags.Static)));
 
-            foreach(MethodInfo method in typeof(PlayerNameplate).GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(x => methodMatchRegex.IsMatch(x.Name)))
+            foreach (MethodInfo method in typeof(PlayerNameplate).GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(x => methodMatchRegex.IsMatch(x.Name)))
             {
                 Log($"Found target Rebuild method ({method.Name})", true);
                 harmony.Patch(method, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnRebuild", BindingFlags.NonPublic | BindingFlags.Static)));
@@ -99,10 +104,9 @@ namespace BTKSANameplateMod
             getPrefsLocal();
         }
 
-
-        public override void OnModSettingsApplied()
+        public override void OnPreferencesSaved()
         {
-            if (hiddenCustomLocal != MelonPrefs.GetBool(settingsCategory, hiddenCustomSetting) || trustColourModeLocal != MelonPrefs.GetString(settingsCategory, trustColourMode) || hideFriendsLocal != MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates) || nameplateOutlineModeLocal != MelonPrefs.GetBool(settingsCategory, nameplateOutlineMode))
+            if (hiddenCustomLocal != MelonPreferences.GetEntryValue<bool>(settingsCategory, hiddenCustomSetting) || trustColourModeLocal != MelonPreferences.GetEntryValue<string>(settingsCategory, trustColourMode) || hideFriendsLocal != MelonPreferences.GetEntryValue<bool>(settingsCategory, hideFriendsNameplates) || nameplateOutlineModeLocal != MelonPreferences.GetEntryValue<bool>(settingsCategory, nameplateOutlineMode))
                 VRCPlayer.field_Internal_Static_VRCPlayer_0.Method_Public_Void_Boolean_0();
 
             getPrefsLocal();
@@ -113,140 +117,154 @@ namespace BTKSANameplateMod
             if (ValidatePlayerAvatar(player))
             {
                 GDBUser user = new GDBUser(player);
-                if (!player.name.Contains("Local"))
+
+                if (user.vrcPlayer.field_Internal_VRCPlayer_0.field_Public_PlayerNameplate_0 == null)
+                    return;
+
+                PlayerNameplate nameplate = user.vrcPlayer.field_Internal_VRCPlayer_0.field_Public_PlayerNameplate_0;
+                NameplateHelper helper = nameplate.GetComponent<NameplateHelper>();
+                if (helper == null)
+                {
+                    helper = nameplate.gameObject.AddComponent<NameplateHelper>();
+                    helper.SetNameplate(nameplate);
+                    Log("Fetching objects from hierarhcy", true);
+                    helper.uiIconBackground = nameplate.gameObject.transform.Find("Contents/Icon/Background").GetComponent<Image>();
+                    helper.uiUserImage = nameplate.gameObject.transform.Find("Contents/Icon/User Image").GetComponent<RawImage>();
+                    helper.uiUserImageContainer = nameplate.gameObject.transform.Find("Contents/Icon").gameObject;
+                    helper.uiNameBackground = nameplate.gameObject.transform.Find("Contents/Main/Background").GetComponent<ImageThreeSlice>();
+                    helper.uiQuickStatsBackground = nameplate.gameObject.transform.Find("Contents/Quick Stats").GetComponent<ImageThreeSlice>();
+                    helper.uiName = nameplate.gameObject.transform.Find("Contents/Main/Text Container/Name").GetComponent<TextMeshProUGUI>();
+                    Log("Created NameplateHelper on nameplate", true);
+                }
+
+                resetNameplate(nameplate);
+
+                ////
+                /// Player nameplate checks
+                ////
+                ///
+
+                //Check if we should replace the background with outline
+                if (nameplateOutlineModeLocal)
+                {
+                    ImageThreeSlice bgImage = helper.uiNameBackground.GetComponent<ImageThreeSlice>();
+                    if (bgImage != null)
+                    {
+                        if (nameplateBGBackup == null)
+                            nameplateBGBackup = bgImage._sprite;
+
+                        bgImage._sprite = nameplateOutline;
+                    }
+                }
+
+                //Check if the Nameplate should be hidden
+                if (hiddenNameplateUserIDs.Contains(player.field_Private_APIUser_0.id))
+                {
+                    Log("Hiding nameplate - HiddenSet", true);
+                    helper.gameObject.transform.localScale = Vector3.zero;
+                    return;
+                }
+
+                //Trust colour replacer
+                if (!trustColourModeLocal.Equals("off"))
+                {
+                    APIUser apiUser = player.field_Private_APIUser_0;
+
+                    Color? trustColor = null;
+                    Color? textColor = null;
+                    bool resetMaterials = false;
+
+                    if (trustColourModeLocal.Equals("friends"))
+                    {
+                        trustColor = VRCPlayer.Method_Public_Static_Color_APIUser_0(apiUser);
+                        textColor = UnityEngine.Color.white;
+                    }
+
+                    if (trustColourModeLocal.Equals("trustonly"))
+                    {
+                        //Setup fake user
+                        APIUser fakeUser = apiUser.MemberwiseClone().Cast<APIUser>();
+
+                        //Fake ID to not detect as a friend
+                        fakeUser.id = "";
+
+                        trustColor = VRCPlayer.Method_Public_Static_Color_APIUser_0(fakeUser);
+                    }
+
+                    if (trustColourModeLocal.Equals("trustname"))
+                    {
+                        textColor = VRCPlayer.Method_Public_Static_Color_APIUser_0(apiUser);
+                        resetMaterials = true;
+                    }
+
+                    Log("Setting nameplate colour", true);
+
+                    ApplyNameplateColour(nameplate, helper, trustColor, trustColor, textColor, null, resetMaterials);
+                }
+
+                //Jank custom colour system that isn't done
+                if (hiddenCustomLocal)
                 {
 
-                    if (user.vrcPlayer.field_Internal_VRCPlayer_0.nameplate == null)
-                        return;
-
-                    PlayerNameplate nameplate = user.vrcPlayer.field_Internal_VRCPlayer_0.nameplate;
-
-                    resetNameplate(nameplate);
-
-                    ////
-                    /// Player nameplate checks
-                    ////
-                    ///
-
-                    //Check if we should replace the background with outline
-                    if (nameplateOutlineModeLocal)
+                    Transform avatarRoot = player.field_Internal_VRCPlayer_0.field_Internal_GameObject_0.transform;
+                    for (int i = 0; i < avatarRoot.childCount; i++)
                     {
-                        ImageThreeSlice bgImage = nameplate.uiNameBackground.GetComponent<ImageThreeSlice>();
-                        if (bgImage != null)
+                        GameObject child = avatarRoot.GetChild(i).gameObject;
+                        if (!child.active && child.name.StartsWith("BTKNameplate:"))
                         {
-                            if (nameplateBGBackup == null)
-                                nameplateBGBackup = bgImage._sprite;
+                            string[] values = child.name.Replace("BTKNameplate:", "").Split(':');
 
-                            bgImage._sprite = nameplateOutline;
-                        }
-                    }
-
-                    //Check if the Nameplate should be hidden
-                    if (hiddenNameplateUserIDs.Contains(player.field_Private_APIUser_0.id))
-                    {
-                        Log("Hiding nameplate - HiddenSet", true);
-                        nameplate.uiContents.transform.localScale = Vector3.zero;
-                        return;
-                    }
-
-                    //Trust colour replacer
-                    if (!trustColourModeLocal.Equals("off"))
-                    {
-                        APIUser apiUser = player.field_Private_APIUser_0;
-
-                        Color? trustColor = null;
-                        Color? textColor = null;
-                        bool resetMaterials = false;
-
-                        if (trustColourModeLocal.Equals("friends"))
-                        {
-                            trustColor = VRCPlayer.Method_Public_Static_Color_APIUser_0(apiUser);
-                            textColor = Color.white;
-                        }
-                        
-                        if(trustColourModeLocal.Equals("trustonly"))
-                        {
-                            //Setup fake user
-                            APIUser fakeUser = apiUser.MemberwiseClone().Cast<APIUser>();
-
-                            //Fake ID to not detect as a friend
-                            fakeUser.id = "";
-
-                            trustColor = VRCPlayer.Method_Public_Static_Color_APIUser_0(fakeUser);
-                        }
-
-                        if (trustColourModeLocal.Equals("trustname"))
-                        {
-                            textColor = VRCPlayer.Method_Public_Static_Color_APIUser_0(apiUser);
-                            resetMaterials = true;
-                        }
-
-                        Log("Setting nameplate colour", true);
-
-                        ApplyNameplateColour(nameplate, trustColor, trustColor, textColor, null, resetMaterials);
-                    }
-
-                    //Jank custom colour system that isn't done
-                    if (hiddenCustomLocal)
-                    {
-
-                        Transform avatarRoot = player.field_Internal_VRCPlayer_0.field_Internal_GameObject_0.transform;
-                        for (int i = 0; i < avatarRoot.childCount; i++)
-                        {
-                            GameObject child = avatarRoot.GetChild(i).gameObject;
-                            if (!child.active && child.name.StartsWith("BTKNameplate:"))
+                            if (values.Length > 0)
                             {
-                                string[] values = child.name.Replace("BTKNameplate:", "").Split(':');
+                                //If we got here bgColor should exist
+                                Color? bgColor = GetColourFromHTMLCode(values[0]);
+                                Color? iconBGColor = null;
+                                Color? textColor = null;
+                                Color? textColorLerp = null;
 
-                                if (values.Length > 0)
-                                {
-                                    //If we got here bgColor should exist
-                                    Color? bgColor = GetColourFromHTMLCode(values[0]);
-                                    Color? iconBGColor = null;
-                                    Color? textColor = null;
-                                    Color? textColorLerp = null;
+                                if (values.Length > 1)
+                                    iconBGColor = GetColourFromHTMLCode(values[1]);
 
-                                    if (values.Length > 1)
-                                        iconBGColor = GetColourFromHTMLCode(values[1]);
+                                if (values.Length > 2)
+                                    textColor = GetColourFromHTMLCode(values[2]);
 
-                                    if (values.Length > 2)
-                                        textColor = GetColourFromHTMLCode(values[2]);
+                                if (values.Length > 3)
+                                    textColorLerp = GetColourFromHTMLCode(values[3]);
 
-                                    if (values.Length > 3)
-                                        textColorLerp = GetColourFromHTMLCode(values[3]);
-
-                                    ApplyNameplateColour(nameplate, bgColor, iconBGColor, textColor, textColorLerp);
-                                }
-
-                                //TODO: Figure out icons and stuff
-                                /*SkinnedMeshRenderer iconComponent = child.GetComponent<SkinnedMeshRenderer>();
-                                if (iconComponent != null)
-                                {
-                                    Log("RendererFound");
-                                    ApplyIcon(iconComponent.material.mainTexture, nameplate, player);
-                                }*/
-
-                                break;
+                                ApplyNameplateColour(nameplate, helper, bgColor, iconBGColor, textColor, textColorLerp);
                             }
-                        }
-                    }
 
-                    //Disable nameplates on friends
-                    if (hideFriendsLocal)
-                    {
-                        if (player.field_Private_APIUser_0 != null)
-                        {
-                            if (APIUser.IsFriendsWith(player.field_Private_APIUser_0.id))
+                            //TODO: Figure out icons and stuff
+                            /*SkinnedMeshRenderer iconComponent = child.GetComponent<SkinnedMeshRenderer>();
+                            if (iconComponent != null)
                             {
-                                Log("Hiding Nameplate - FriendsHide", true);
-                                nameplate.uiContents.transform.localScale = Vector3.zero;
-                            }
+                                Log("RendererFound");
+                                ApplyIcon(iconComponent.material.mainTexture, nameplate, player);
+                            }*/
+
+                            break;
                         }
                     }
-
                 }
+
+                //Disable nameplates on friends
+                if (hideFriendsLocal)
+                {
+                    if (player.field_Private_APIUser_0 != null)
+                    {
+                        if (APIUser.IsFriendsWith(player.field_Private_APIUser_0.id))
+                        {
+                            Log("Hiding Nameplate - FriendsHide", true);
+                            helper.gameObject.transform.localScale = Vector3.zero;
+                        }
+                    }
+                }
+
+
             }
         }
+
+        #region Nameplate Functions
 
         private Color? GetColourFromHTMLCode(string colourCode)
         {
@@ -264,7 +282,7 @@ namespace BTKSANameplateMod
 
         private void resetNameplate(PlayerNameplate nameplate)
         {
-            nameplate.uiContents.transform.localScale = new Vector3(1, 1, 1);
+            nameplate.gameObject.transform.localScale = new Vector3(1, 1, 1);
 
             NameplateHelper helper = nameplate.gameObject.GetComponent<NameplateHelper>();
             if (helper != null)
@@ -273,25 +291,16 @@ namespace BTKSANameplateMod
             }
 
             //Outline mode was enabled at some point so let's make sure to reset it
-            if (nameplateBGBackup != null)
+            if (nameplateBGBackup != null && helper != null)
             {
-                ImageThreeSlice bgImage = nameplate.uiNameBackground.GetComponent<ImageThreeSlice>();
+                ImageThreeSlice bgImage = helper.uiNameBackground.GetComponent<ImageThreeSlice>();
                 if (bgImage != null)
                 {
                     bgImage._sprite = nameplateBGBackup;
                 }
             }
 
-            ApplyNameplateColour(nameplate, Color.white, Color.white, null, null, true);
-        }
-
-        private void ApplyIcon(Texture texture, PlayerNameplate nameplate, Player player)
-        {
-            nameplate.uiIconBackground.enabled = true;
-            nameplate.uiUserImage.enabled = true;
-            nameplate.uiUserImageContainer.SetActive(true);
-
-            nameplate.uiUserImage.texture = texture;
+            ApplyNameplateColour(nameplate, helper, UnityEngine.Color.white, UnityEngine.Color.white, null, null, true);
         }
 
         /// <summary>
@@ -303,36 +312,30 @@ namespace BTKSANameplateMod
         /// <param name="textColor">Sets the player name text</param>
         /// <param name="textColorLerp">Sets NameplateHelper to do a fade between textColor and textColorLerp on the player name text</param>
         /// <param name="resetToDefaultMat">Resets the materials on the nameplate</param>
-        private void ApplyNameplateColour(PlayerNameplate nameplate, Color? bgColor = null, Color? iconBGColor = null, Color? textColor = null, Color? textColorLerp = null, bool resetToDefaultMat = false)
+        private void ApplyNameplateColour(PlayerNameplate nameplate, NameplateHelper helper, Color? bgColor = null, Color? iconBGColor = null, Color? textColor = null, Color? textColorLerp = null, bool resetToDefaultMat = false)
         {
+            if (helper == null)
+                return;
+
             Log("Apply colours", true);
 
             if (!resetToDefaultMat)
             {
-                nameplate.uiNameBackground.material = npUIMaterial;
-                nameplate.uiQuickStatsBackground.material = npUIMaterial;
-                nameplate.uiIconBackground.material = npUIMaterial;
+                helper.uiNameBackground.material = npUIMaterial;
+                helper.uiQuickStatsBackground.material = npUIMaterial;
+                helper.uiIconBackground.material = npUIMaterial;
             }
             else
             {
-                nameplate.uiNameBackground.material = null;
-                nameplate.uiQuickStatsBackground.material = null;
-                nameplate.uiIconBackground.material = null;
+                helper.uiNameBackground.material = null;
+                helper.uiQuickStatsBackground.material = null;
+                helper.uiIconBackground.material = null;
             }
 
-            NameplateHelper helper = nameplate.gameObject.GetComponent<NameplateHelper>();
-            if (helper == null)
-            {
-                //Create helper component
-                helper = nameplate.gameObject.AddComponent<NameplateHelper>();
-                helper.SetNameplate(nameplate);
-                Log("Created NameplateHelper on nameplate", true);
-            }
-
-            Color oldBGColor = nameplate.uiNameBackground.color;
-            Color oldIconBGColor = nameplate.uiIconBackground.color;
-            Color oldQSBGColor = nameplate.uiQuickStatsBackground.color;
-            Color oldTextColor = nameplate.uiName.faceColor;
+            Color oldBGColor = helper.uiNameBackground.color;
+            Color oldIconBGColor = helper.uiIconBackground.color;
+            Color oldQSBGColor = helper.uiQuickStatsBackground.color;
+            Color oldTextColor = helper.uiName.faceColor;
 
             //Are we setting BGColor?
             if (bgColor.HasValue)
@@ -341,8 +344,8 @@ namespace BTKSANameplateMod
                 Color quickStatsBGColor = bgColor.Value;
                 bgColor2.a = oldBGColor.a;
                 quickStatsBGColor.a = oldQSBGColor.a;
-                nameplate.uiNameBackground.color = bgColor2;
-                nameplate.uiQuickStatsBackground.color = quickStatsBGColor;
+                helper.uiNameBackground.color = bgColor2;
+                helper.uiQuickStatsBackground.color = quickStatsBGColor;
             }
 
             //Are we setting an iconBGColor?
@@ -350,7 +353,7 @@ namespace BTKSANameplateMod
             {
                 Color iconBGColor2 = bgColor.Value;
                 iconBGColor2.a = oldIconBGColor.a;
-                nameplate.uiIconBackground.color = iconBGColor2;
+                helper.uiIconBackground.color = iconBGColor2;
             }
 
             //Check if we should set the text colour
@@ -365,7 +368,7 @@ namespace BTKSANameplateMod
             }
 
             //Check if we should be doing a colour lerp
-            if(textColor.HasValue && textColorLerp.HasValue)
+            if (textColor.HasValue && textColorLerp.HasValue)
             {
                 Color textColor2 = textColor.Value;
                 Color textColorLerp2 = textColorLerp.Value;
@@ -415,6 +418,8 @@ namespace BTKSANameplateMod
             }
         }
 
+        #endregion
+
         private void getPrefsLocal()
         {
             hiddenCustomLocal = MelonPrefs.GetBool(settingsCategory, hiddenCustomSetting);
@@ -444,6 +449,15 @@ namespace BTKSANameplateMod
                 nameplateOutline = bundle.LoadAsset_Internal("NameplateOutline", Il2CppType.Of<Sprite>()).Cast<Sprite>();
                 nameplateOutline.hideFlags |= HideFlags.DontUnloadUnusedAsset;
             }
+        }
+
+        private void ApplyIcon(Texture texture, PlayerNameplate nameplate, NameplateHelper helper, Player player)
+        {
+            helper.uiIconBackground.enabled = true;
+            helper.uiUserImage.enabled = true;
+            helper.uiUserImageContainer.SetActive(true);
+
+            helper.uiUserImage.texture = texture;
         }
 
         private static void OnRebuild(PlayerNameplate __instance)
@@ -503,10 +517,10 @@ namespace BTKSANameplateMod
 
         public static void Log(string log, bool dbg = false)
         {
-            if (!Imports.IsDebugMode() && dbg)
+            if (!MelonDebug.IsEnabled() && dbg)
                 return;
 
-            MelonLogger.Log(log);
+            MelonLogger.Msg(log);
         }
 
         public static Player getPlayerFromPlayerlist(string userID)

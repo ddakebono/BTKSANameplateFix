@@ -1,11 +1,20 @@
 ﻿using System;
+using TMPro;
 using UnhollowerBaseLib.Attributes;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace BTKSANameplateMod
 {
     public class NameplateHelper : MonoBehaviour
     {
+        //Nameplate object references
+        public Graphic uiIconBackground;
+        public RawImage uiUserImage;
+        public GameObject uiUserImageContainer;
+        public ImageThreeSlice uiNameBackground;
+        public ImageThreeSlice uiQuickStatsBackground;
+        public TextMeshProUGUI uiName;
 
         private PlayerNameplate nameplate = null;
         private Color nameColour;
@@ -60,7 +69,7 @@ namespace BTKSANameplateMod
             {
                 if (setColour)
                 {
-                    nameplate.uiName.color = nameColour;
+                    uiName.color = nameColour;
                 }
             }
         }
@@ -75,7 +84,7 @@ namespace BTKSANameplateMod
                 else
                     lerpValue -= Time.deltaTime;
 
-                if(lerpValue >= lerpTransitionTime)
+                if (lerpValue >= lerpTransitionTime)
                 {
                     lerpValue = lerpTransitionTime;
                     lerpReverse = true;
@@ -87,7 +96,7 @@ namespace BTKSANameplateMod
                     lerpReverse = false;
                 }
 
-                nameplate.uiName.color = Color.Lerp(nameColour, nameColour2, lerpValue);
+                uiName.color = Color.Lerp(nameColour, nameColour2, lerpValue);
 
             }
         }
