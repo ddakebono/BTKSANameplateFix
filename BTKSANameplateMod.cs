@@ -23,7 +23,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "2.2.1"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "2.2.2"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -422,10 +422,10 @@ namespace BTKSANameplateMod
 
         private void getPrefsLocal()
         {
-            hiddenCustomLocal = MelonPrefs.GetBool(settingsCategory, hiddenCustomSetting);
-            hideFriendsLocal = MelonPrefs.GetBool(settingsCategory, hideFriendsNameplates);
-            trustColourModeLocal = MelonPrefs.GetString(settingsCategory, trustColourMode);
-            nameplateOutlineModeLocal = MelonPrefs.GetBool(settingsCategory, nameplateOutlineMode);
+            hiddenCustomLocal = MelonPreferences.GetEntryValue<bool>(settingsCategory, hiddenCustomSetting);
+            hideFriendsLocal = MelonPreferences.GetEntryValue<bool>(settingsCategory, hideFriendsNameplates);
+            trustColourModeLocal = MelonPreferences.GetEntryValue<string>(settingsCategory, trustColourMode);
+            nameplateOutlineModeLocal = MelonPreferences.GetEntryValue<bool>(settingsCategory, nameplateOutlineMode);
         }
 
         private void loadAssets()
@@ -466,6 +466,13 @@ namespace BTKSANameplateMod
             if (helper != null)
             {
                 helper.OnRebuild();
+            }
+            else
+            {
+                //Nameplate doesn't have a helper, lets fix that
+                if (__instance.field_Private_VRCPlayer_0 != null)
+                    if (__instance.field_Private_VRCPlayer_0.field_Private_Player_0 != null)
+                        instance.OnUpdatePlayer(__instance.field_Private_VRCPlayer_0.field_Private_Player_0);
             }
         }
 
