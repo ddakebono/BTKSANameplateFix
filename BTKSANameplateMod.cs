@@ -10,11 +10,11 @@ using System.Text.RegularExpressions;
 using TMPro;
 using UIExpansionKit.API;
 using UnhollowerRuntimeLib;
+using UnhollowerRuntimeLib.XrefScans;
 using UnityEngine;
 using UnityEngine.UI;
 using VRC;
 using VRC.Core;
-using VRC.SDKBase;
 
 namespace BTKSANameplateMod
 {
@@ -23,7 +23,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "2.2.3"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "2.2.4"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -91,6 +91,21 @@ namespace BTKSANameplateMod
             {
                 Log($"Found target Rebuild method ({method.Name})", true);
                 harmony.Patch(method, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnRebuild", BindingFlags.NonPublic | BindingFlags.Static)));
+            }
+
+            //Patching ShouldShowSocialRank to always be true
+            foreach (MethodInfo method in typeof(VRCPlayer).GetMethods(BindingFlags.Public | BindingFlags.Static))
+            {
+                List<string> calledMethodNames = new List<string>();
+
+                if (method.Name.Contains("Method_Public_Static_Boolean_APIUser_"))
+                {
+                    if (XrefMatchCalledMethodNameList(method, new List<string>() { "Method_Public_Static_Player_String_0", "op_Equality", "op_Equality" }))
+                    {
+                        Log($"Found valid ShouldShowSocialRank method {method.Name}", true);
+                        harmony.Patch(method, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("GenericReturnTrue", BindingFlags.Public | BindingFlags.Static)));
+                    }
+                }
             }
 
             ClassInjector.RegisterTypeInIl2Cpp<NameplateHelper>();
@@ -418,6 +433,15 @@ namespace BTKSANameplateMod
             }
         }
 
+        private void ApplyIcon(Texture texture, PlayerNameplate nameplate, NameplateHelper helper, Player player)
+        {
+            helper.uiIconBackground.enabled = true;
+            helper.uiUserImage.enabled = true;
+            helper.uiUserImageContainer.SetActive(true);
+
+            helper.uiUserImage.texture = texture;
+        }
+
         #endregion
 
         private void getPrefsLocal()
@@ -451,14 +475,7 @@ namespace BTKSANameplateMod
             }
         }
 
-        private void ApplyIcon(Texture texture, PlayerNameplate nameplate, NameplateHelper helper, Player player)
-        {
-            helper.uiIconBackground.enabled = true;
-            helper.uiUserImage.enabled = true;
-            helper.uiUserImageContainer.SetActive(true);
-
-            helper.uiUserImage.texture = texture;
-        }
+        #region Patches
 
         private static void OnRebuild(PlayerNameplate __instance)
         {
@@ -488,6 +505,15 @@ namespace BTKSANameplateMod
             }));
         }
 
+        public static void GenericReturnTrue(bool __result)
+        {
+            __result = true;
+        }
+
+        #endregion
+
+        #region Utils
+
         public static void Log(string log, bool dbg = false)
         {
             if (!MelonDebug.IsEnabled() && dbg)
@@ -509,6 +535,35 @@ namespace BTKSANameplateMod
             return null;
         }
 
+        /// <summary>
+        /// Searches the given method to see if it contains the entire given list and no extra
+        /// </summary>
+        /// <param name="targetMethod">Target Method</param>
+        /// <param name="calledMethodNames">List of the names of the called methods</param>
+        /// <returns></returns>
+        public static bool XrefMatchCalledMethodNameList(MethodBase targetMethod, List<string> calledMethodNames)
+        {
+            IEnumerable<XrefInstance> instances = XrefScanner.XrefScan(targetMethod);
+
+            foreach (XrefInstance instance in instances)
+            {
+                MethodBase calledMethod = instance.TryResolve();
+                if (calledMethod != null)
+                {
+                    if (calledMethodNames.Contains(calledMethod.Name))
+                    {
+                        calledMethodNames.Remove(calledMethod.Name);
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return calledMethodNames.Count == 0;
+        }
+
         bool ValidatePlayerAvatar(VRCPlayer player)
         {
             return !(player == null ||
@@ -517,6 +572,8 @@ namespace BTKSANameplateMod
                      player.field_Internal_GameObject_0 == null ||
                      player.field_Internal_GameObject_0.name.IndexOf("Avatar_Utility_Base_") == 0);
         }
+
+        #endregion
 
     }
 }
