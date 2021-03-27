@@ -23,7 +23,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "2.2.4"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "2.3.0"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -33,6 +33,9 @@ namespace BTKSANameplateMod
 
         public static BTKSANameplateMod instance;
 
+        public static bool IgnoreFriends = false;
+        public static bool IsQMOpen = false;
+
         public HarmonyInstance harmony;
 
         private string settingsCategory = "BTKSANameplateFix";
@@ -40,6 +43,10 @@ namespace BTKSANameplateMod
         private string hideFriendsNameplates = "hideFriendsNameplates";
         private string trustColourMode = "trustColourMode";
         private string nameplateOutlineMode = "nameplateOutline";
+        private static string nameplateAlwaysShowQuickStats = "nmAlwaysShowQuickInfo";
+        private static string nameplateCloseRangeFade = "nmCloseRangeFade";
+        private static string nameplateCloseRangeDistMin = "nmCloseRangeDistMin";
+        private static string nameplateCloseRangeDistMax = "nmCloseRangeDistMax";
 
         private Regex methodMatchRegex = new Regex("Method_Public_Void_\\d", RegexOptions.Compiled);
 
@@ -48,6 +55,10 @@ namespace BTKSANameplateMod
         bool hideFriendsLocal = false;
         string trustColourModeLocal = "off";
         bool nameplateOutlineModeLocal = false;
+        bool alwaysShowStatsLocal = false;
+        bool closeRangeFadeLocal = false;
+        float closeRangeDistMin = 2f;
+        float closeRangeDistMax = 3f;
 
         Sprite nameplateBGBackup;
 
@@ -77,7 +88,11 @@ namespace BTKSANameplateMod
             MelonPreferences.CreateEntry<bool>(settingsCategory, hideFriendsNameplates, false, "Hide Friends Nameplates");
             MelonPreferences.CreateEntry<string>(settingsCategory, trustColourMode, "friends", "Trust Colour Mode");
             MelonPreferences.CreateEntry<bool>(settingsCategory, nameplateOutlineMode, false, "Nameplate Outline Background");
-            ExpansionKitApi.RegisterSettingAsStringEnum(settingsCategory, trustColourMode, new[] { ("off", "Disable Trust Colours"), ("friends", "Trust Colours (with friend colour)"), ("trustonly", "Trust Colours (Ignore friend colour)"), ("trustname", "Trust Colours on Names Only") });
+            MelonPreferences.CreateEntry<bool>(settingsCategory, nameplateAlwaysShowQuickStats, false, "Always Show Quick Stats");
+            MelonPreferences.CreateEntry<bool>(settingsCategory, nameplateCloseRangeFade, false, "Close Range Fade");
+            MelonPreferences.CreateEntry<float>(settingsCategory, nameplateCloseRangeDistMin, 2f, "Close Range Min Distance");
+            MelonPreferences.CreateEntry<float>(settingsCategory, nameplateCloseRangeDistMax, 3f, "Close Range Max Distance");
+            ExpansionKitApi.RegisterSettingAsStringEnum(settingsCategory, trustColourMode, new[] { ("off", "Disable Trust Colours"), ("friends", "Show Friends Colour"), ("trustonly", "Ignore Friends Colour"), ("trustname", "Trust Colour On Name") });
 
             //Register our menu button
             ExpansionKitApi.GetExpandedMenu(ExpandedMenu.UserQuickMenu).AddSimpleButton("Toggle Nameplate Visibility", ToggleNameplateVisiblity);
@@ -93,19 +108,24 @@ namespace BTKSANameplateMod
                 harmony.Patch(method, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnRebuild", BindingFlags.NonPublic | BindingFlags.Static)));
             }
 
-            //Patching ShouldShowSocialRank to always be true
-            foreach (MethodInfo method in typeof(VRCPlayer).GetMethods(BindingFlags.Public | BindingFlags.Static))
-            {
-                List<string> calledMethodNames = new List<string>();
+            //Loukylor is a fuckin nerd, also thanks for the things, very good shit
+            harmony.Patch(typeof(APIUser).GetMethod("IsFriendsWith", BindingFlags.Public | BindingFlags.Static), new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("FriendsPatch", BindingFlags.Public | BindingFlags.Static)));
 
-                if (method.Name.Contains("Method_Public_Static_Boolean_APIUser_"))
-                {
-                    if (XrefMatchCalledMethodNameList(method, new List<string>() { "Method_Public_Static_Player_String_0", "op_Equality", "op_Equality" }))
-                    {
-                        Log($"Found valid ShouldShowSocialRank method {method.Name}", true);
-                        harmony.Patch(method, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("GenericReturnTrue", BindingFlags.Public | BindingFlags.Static)));
-                    }
-                }
+            Log("Patching QM Open/Close functions", true);
+            MethodInfo closeQuickMenu = typeof(QuickMenu).GetMethods()
+                .Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && !mb.Name.Contains("PDM") && CheckUsed(mb, "Method_Public_Void_Int32_Boolean_")).First();
+
+            MethodInfo openQuickMenu = typeof(QuickMenu).GetMethods()
+                 .Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && mb.GetParameters().Any(pi => pi.HasDefaultValue == false)).First();
+
+            try
+            {
+                harmony.Patch(openQuickMenu, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("QMOpen", BindingFlags.Public | BindingFlags.Static)));
+                harmony.Patch(closeQuickMenu, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("QMClose", BindingFlags.Public | BindingFlags.Static)));
+            }
+            catch (Exception e)
+            {
+                Log("Unable to patch Quickmenu Open/Close functions!");
             }
 
             ClassInjector.RegisterTypeInIl2Cpp<NameplateHelper>();
@@ -121,10 +141,8 @@ namespace BTKSANameplateMod
 
         public override void OnPreferencesSaved()
         {
-            if (hiddenCustomLocal != MelonPreferences.GetEntryValue<bool>(settingsCategory, hiddenCustomSetting) || trustColourModeLocal != MelonPreferences.GetEntryValue<string>(settingsCategory, trustColourMode) || hideFriendsLocal != MelonPreferences.GetEntryValue<bool>(settingsCategory, hideFriendsNameplates) || nameplateOutlineModeLocal != MelonPreferences.GetEntryValue<bool>(settingsCategory, nameplateOutlineMode))
+            if (getPrefsLocal())
                 VRCPlayer.field_Internal_Static_VRCPlayer_0.Method_Public_Void_Boolean_0();
-
-            getPrefsLocal();
         }
 
         public void OnAvatarIsReady(VRCPlayer vrcPlayer)
@@ -158,6 +176,19 @@ namespace BTKSANameplateMod
                 /// Player nameplate checks
                 ////
                 ///
+
+                //Check if we should be showing quick stats
+                helper.AlwaysShowQuickInfo = alwaysShowStatsLocal;
+
+                //Enable close range fade
+                if (!vrcPlayer.name.Contains("Local") && closeRangeFadeLocal)
+                {
+                    helper.uiGroup = vrcPlayer.field_Public_PlayerNameplate_0.gameObject.GetComponent<CanvasGroup>();
+                    helper.localPlayerGO = VRCPlayer.field_Internal_Static_VRCPlayer_0.gameObject;
+                    helper.closeRangeFade = true;
+                    helper.fadeMinRange = closeRangeDistMin;
+                    helper.fadeMaxRange = closeRangeDistMax;
+                }
 
                 //Check if we should replace the background with outline
                 if (nameplateOutlineModeLocal)
@@ -197,13 +228,9 @@ namespace BTKSANameplateMod
 
                     if (trustColourModeLocal.Equals("trustonly"))
                     {
-                        //Setup fake user
-                        APIUser fakeUser = apiUser.MemberwiseClone().Cast<APIUser>();
-
-                        //Fake ID to not detect as a friend
-                        fakeUser.id = "";
-
-                        trustColor = VRCPlayer.Method_Public_Static_Color_APIUser_0(fakeUser);
+                        BTKSANameplateMod.IgnoreFriends = true;
+                        trustColor = VRCPlayer.Method_Public_Static_Color_APIUser_0(apiUser);
+                        BTKSANameplateMod.IgnoreFriends = false;
                     }
 
                     if (trustColourModeLocal.Equals("trustname"))
@@ -275,7 +302,7 @@ namespace BTKSANameplateMod
                     }
                 }
 
-
+                helper.OnRebuild(IsQMOpen);
             }
         }
 
@@ -379,7 +406,7 @@ namespace BTKSANameplateMod
                 textColor2.a = oldTextColor.a;
 
                 helper.SetNameColour(textColor2);
-                helper.OnRebuild();
+                helper.OnRebuild(IsQMOpen);
             }
 
             //Check if we should be doing a colour lerp
@@ -444,12 +471,59 @@ namespace BTKSANameplateMod
 
         #endregion
 
-        private void getPrefsLocal()
+        private bool getPrefsLocal()
         {
-            hiddenCustomLocal = MelonPreferences.GetEntryValue<bool>(settingsCategory, hiddenCustomSetting);
-            hideFriendsLocal = MelonPreferences.GetEntryValue<bool>(settingsCategory, hideFriendsNameplates);
-            trustColourModeLocal = MelonPreferences.GetEntryValue<string>(settingsCategory, trustColourMode);
-            nameplateOutlineModeLocal = MelonPreferences.GetEntryValue<bool>(settingsCategory, nameplateOutlineMode);
+            bool updated = false;
+
+            if (hiddenCustomLocal != MelonPreferences.GetEntryValue<bool>(settingsCategory, hiddenCustomSetting))
+            {
+                hiddenCustomLocal = MelonPreferences.GetEntryValue<bool>(settingsCategory, hiddenCustomSetting);
+                updated = true;
+            }
+
+            if (hideFriendsLocal != MelonPreferences.GetEntryValue<bool>(settingsCategory, hideFriendsNameplates))
+            {
+                hideFriendsLocal = MelonPreferences.GetEntryValue<bool>(settingsCategory, hideFriendsNameplates);
+                updated = true;
+            }
+
+            if (trustColourModeLocal != MelonPreferences.GetEntryValue<string>(settingsCategory, trustColourMode))
+            {
+                trustColourModeLocal = MelonPreferences.GetEntryValue<string>(settingsCategory, trustColourMode);
+                updated = true;
+            }
+
+            if (nameplateOutlineModeLocal != MelonPreferences.GetEntryValue<bool>(settingsCategory, nameplateOutlineMode))
+            {
+                nameplateOutlineModeLocal = MelonPreferences.GetEntryValue<bool>(settingsCategory, nameplateOutlineMode);
+                updated = true;
+            }
+
+            if (alwaysShowStatsLocal != MelonPreferences.GetEntryValue<bool>(settingsCategory, nameplateAlwaysShowQuickStats))
+            {
+                alwaysShowStatsLocal = MelonPreferences.GetEntryValue<bool>(settingsCategory, nameplateAlwaysShowQuickStats); ;
+                updated = true;
+            }
+
+            if (closeRangeFadeLocal != MelonPreferences.GetEntryValue<bool>(settingsCategory, nameplateCloseRangeFade))
+            {
+                closeRangeFadeLocal = MelonPreferences.GetEntryValue<bool>(settingsCategory, nameplateCloseRangeFade);
+                updated = true;
+            }
+
+            if (closeRangeDistMin != MelonPreferences.GetEntryValue<float>(settingsCategory, nameplateCloseRangeDistMin))
+            {
+                closeRangeDistMin = MelonPreferences.GetEntryValue<float>(settingsCategory, nameplateCloseRangeDistMin);
+                updated = true;
+            }
+
+            if (closeRangeDistMax != MelonPreferences.GetEntryValue<float>(settingsCategory, nameplateCloseRangeDistMax))
+            {
+                closeRangeDistMax = MelonPreferences.GetEntryValue<float>(settingsCategory, nameplateCloseRangeDistMax);
+                updated = true;
+            }
+
+            return updated;
         }
 
         private void loadAssets()
@@ -482,7 +556,7 @@ namespace BTKSANameplateMod
             NameplateHelper helper = __instance.gameObject.GetComponent<NameplateHelper>();
             if (helper != null)
             {
-                helper.OnRebuild();
+                helper.OnRebuild(IsQMOpen);
             }
             else
             {
@@ -505,9 +579,24 @@ namespace BTKSANameplateMod
             }));
         }
 
-        public static void GenericReturnTrue(bool __result)
+        public static bool FriendsPatch(ref bool __result)
         {
-            __result = true;
+            if (IgnoreFriends)
+            {
+                __result = false;
+                return false;
+            }
+            return true;
+        }
+
+        public static void QMOpen()
+        {
+            IsQMOpen = true;
+        }
+
+        public static void QMClose()
+        {
+            IsQMOpen = false;
         }
 
         #endregion
@@ -535,35 +624,6 @@ namespace BTKSANameplateMod
             return null;
         }
 
-        /// <summary>
-        /// Searches the given method to see if it contains the entire given list and no extra
-        /// </summary>
-        /// <param name="targetMethod">Target Method</param>
-        /// <param name="calledMethodNames">List of the names of the called methods</param>
-        /// <returns></returns>
-        public static bool XrefMatchCalledMethodNameList(MethodBase targetMethod, List<string> calledMethodNames)
-        {
-            IEnumerable<XrefInstance> instances = XrefScanner.XrefScan(targetMethod);
-
-            foreach (XrefInstance instance in instances)
-            {
-                MethodBase calledMethod = instance.TryResolve();
-                if (calledMethod != null)
-                {
-                    if (calledMethodNames.Contains(calledMethod.Name))
-                    {
-                        calledMethodNames.Remove(calledMethod.Name);
-                    }
-                    else
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            return calledMethodNames.Count == 0;
-        }
-
         bool ValidatePlayerAvatar(VRCPlayer player)
         {
             return !(player == null ||
@@ -573,7 +633,16 @@ namespace BTKSANameplateMod
                      player.field_Internal_GameObject_0.name.IndexOf("Avatar_Utility_Base_") == 0);
         }
 
-        #endregion
+        public static bool CheckUsed(MethodBase methodBase, string methodName)
+        {
+            try
+            {
+                return UnhollowerRuntimeLib.XrefScans.XrefScanner.UsedBy(methodBase).Where(instance => instance.TryResolve() != null && instance.TryResolve().Name.Contains(methodName)).Any();
+            }
+            catch { }
+            return false;
+        }
 
+        #endregion
     }
 }

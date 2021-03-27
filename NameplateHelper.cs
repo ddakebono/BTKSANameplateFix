@@ -12,9 +12,16 @@ namespace BTKSANameplateMod
         public Graphic uiIconBackground;
         public RawImage uiUserImage;
         public GameObject uiUserImageContainer;
+        public GameObject uiQuickStatsGO;
         public ImageThreeSlice uiNameBackground;
         public ImageThreeSlice uiQuickStatsBackground;
         public TextMeshProUGUI uiName;
+        public CanvasGroup uiGroup;
+        public GameObject localPlayerGO;
+        public float fadeMaxRange;
+        public float fadeMinRange;
+        public bool closeRangeFade = false;
+        public bool AlwaysShowQuickInfo = false;
 
         private PlayerNameplate nameplate = null;
         private Color nameColour;
@@ -26,6 +33,7 @@ namespace BTKSANameplateMod
         private bool lerpReverse = false;
         private float lerpValue = 0f;
         private float lerpTransitionTime = 3f;
+        private bool closeRangeFadePause = false;
 
         public NameplateHelper(IntPtr ptr) : base(ptr)
         {
@@ -60,10 +68,14 @@ namespace BTKSANameplateMod
         {
             setColour = false;
             colourLerp = false;
+            AlwaysShowQuickInfo = false;
+            closeRangeFade = false;
+            if (uiGroup != null)
+                uiGroup.alpha = 1;
         }
 
         [HideFromIl2Cpp]
-        public void OnRebuild()
+        public void OnRebuild(bool QMOpen)
         {
             if (nameplate != null)
             {
@@ -71,11 +83,48 @@ namespace BTKSANameplateMod
                 {
                     uiName.color = nameColour;
                 }
+
+                if (AlwaysShowQuickInfo)
+                {
+                    uiQuickStatsGO.SetActive(true);
+                }
+
+                if (closeRangeFade && uiGroup != null)
+                {
+                    //Reset and pause CloseRangeFade
+                    if (QMOpen)
+                    {
+                        closeRangeFadePause = true;
+                        uiGroup.alpha = 1;
+                    }
+                    else
+                    {
+                        closeRangeFadePause = false;
+                    }
+                }
             }
         }
 
         public void Update()
         {
+            if (closeRangeFade && uiGroup != null && localPlayerGO != null && !closeRangeFadePause)
+            {
+                float distance = Vector3.Distance(nameplate.gameObject.transform.position, localPlayerGO.transform.position);
+                if (distance < fadeMaxRange && distance > fadeMinRange)
+                {
+                    //Find our alpha value
+                    float alphaValue = (distance - fadeMinRange) / (fadeMaxRange - fadeMinRange);
+
+                    uiGroup.alpha = alphaValue;
+                }
+
+                if (distance >= fadeMaxRange)
+                    uiGroup.alpha = 1;
+
+                if (distance <= fadeMinRange)
+                    uiGroup.alpha = 0;
+            }
+
             //Check if we should be doing the lerp
             if (colourLerp)
             {
