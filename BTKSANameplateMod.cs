@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using TMPro;
 using UIExpansionKit.API;
@@ -43,10 +44,11 @@ namespace BTKSANameplateMod
         private string hideFriendsNameplates = "hideFriendsNameplates";
         private string trustColourMode = "trustColourMode";
         private string nameplateOutlineMode = "nameplateOutline";
-        private static string nameplateAlwaysShowQuickStats = "nmAlwaysShowQuickInfo";
-        private static string nameplateCloseRangeFade = "nmCloseRangeFade";
-        private static string nameplateCloseRangeDistMin = "nmCloseRangeDistMin";
-        private static string nameplateCloseRangeDistMax = "nmCloseRangeDistMax";
+        private string nameplateAlwaysShowQuickStats = "nmAlwaysShowQuickInfo";
+        private string nameplateCloseRangeFade = "nmCloseRangeFade";
+        private string nameplateCloseRangeDistMin = "nmCloseRangeDistMin";
+        private string nameplateCloseRangeDistMax = "nmCloseRangeDistMax";
+        private string nameplateRandomColours = "nmRandomColours";
 
         private Regex methodMatchRegex = new Regex("Method_Public_Void_\\d", RegexOptions.Compiled);
 
@@ -59,6 +61,7 @@ namespace BTKSANameplateMod
         bool closeRangeFadeLocal = false;
         float closeRangeDistMin = 2f;
         float closeRangeDistMax = 3f;
+        bool randomColourLocal = false;
 
         Sprite nameplateBGBackup;
 
@@ -67,6 +70,10 @@ namespace BTKSANameplateMod
         Sprite nameplateOutline;
 
         List<string> hiddenNameplateUserIDs = new List<string>();
+
+        MethodInfo reloadAvatarsMethod;
+
+        MD5 hashing = MD5.Create();
 
         #endregion
 
@@ -92,6 +99,7 @@ namespace BTKSANameplateMod
             MelonPreferences.CreateEntry<bool>(settingsCategory, nameplateCloseRangeFade, false, "Close Range Fade");
             MelonPreferences.CreateEntry<float>(settingsCategory, nameplateCloseRangeDistMin, 2f, "Close Range Min Distance");
             MelonPreferences.CreateEntry<float>(settingsCategory, nameplateCloseRangeDistMax, 3f, "Close Range Max Distance");
+            MelonPreferences.CreateEntry<bool>(settingsCategory, nameplateRandomColours, false, "Random Nameplate Colours");
             ExpansionKitApi.RegisterSettingAsStringEnum(settingsCategory, trustColourMode, new[] { ("off", "Disable Trust Colours"), ("friends", "Show Friends Colour"), ("trustonly", "Ignore Friends Colour"), ("trustname", "Trust Colour On Name") });
 
             //Register our menu button
@@ -128,6 +136,10 @@ namespace BTKSANameplateMod
                 Log("Unable to patch Quickmenu Open/Close functions!");
             }
 
+            reloadAvatarsMethod = typeof(VRCPlayer).GetMethods().Where(method => method.Name.Contains("Method_Public_Void_Boolean_") && method.GetParameters().Any(param => param.IsOptional)).First();
+            if (reloadAvatarsMethod == null)
+                Log("Unable to get Reload All Avatars method!");
+
             ClassInjector.RegisterTypeInIl2Cpp<NameplateHelper>();
 
             Log("Loading Nameplate Assets");
@@ -141,8 +153,10 @@ namespace BTKSANameplateMod
 
         public override void OnPreferencesSaved()
         {
-            if (getPrefsLocal())
-                VRCPlayer.field_Internal_Static_VRCPlayer_0.Method_Public_Void_Boolean_0();
+            if (getPrefsLocal()) 
+            {
+                reloadAvatarsMethod.Invoke(VRCPlayer.field_Internal_Static_VRCPlayer_0, new object[] { false });
+            }
         }
 
         public void OnAvatarIsReady(VRCPlayer vrcPlayer)
@@ -161,6 +175,7 @@ namespace BTKSANameplateMod
                     helper = nameplate.gameObject.AddComponent<NameplateHelper>();
                     helper.SetNameplate(nameplate);
                     Log("Fetching objects from hierarhcy", true);
+                    helper.uiQuickStatsGO = nameplate.gameObject.transform.Find("Contents/Quick Stats").gameObject;
                     helper.uiIconBackground = nameplate.gameObject.transform.Find("Contents/Icon/Background").GetComponent<Image>();
                     helper.uiUserImage = nameplate.gameObject.transform.Find("Contents/Icon/User Image").GetComponent<RawImage>();
                     helper.uiUserImageContainer = nameplate.gameObject.transform.Find("Contents/Icon").gameObject;
@@ -184,7 +199,7 @@ namespace BTKSANameplateMod
                 if (!vrcPlayer.name.Contains("Local") && closeRangeFadeLocal)
                 {
                     helper.uiGroup = vrcPlayer.field_Public_PlayerNameplate_0.gameObject.GetComponent<CanvasGroup>();
-                    helper.localPlayerGO = VRCPlayer.field_Internal_Static_VRCPlayer_0.gameObject;
+                    helper.localPlayerGO = VRCVrCamera.field_Private_Static_VRCVrCamera_0.gameObject;
                     helper.closeRangeFade = true;
                     helper.fadeMinRange = closeRangeDistMin;
                     helper.fadeMaxRange = closeRangeDistMax;
@@ -212,7 +227,7 @@ namespace BTKSANameplateMod
                 }
 
                 //Trust colour replacer
-                if (!trustColourModeLocal.Equals("off"))
+                if (!trustColourModeLocal.Equals("off") && !randomColourLocal)
                 {
                     APIUser apiUser = player.field_Private_APIUser_0;
 
@@ -242,6 +257,14 @@ namespace BTKSANameplateMod
                     Log("Setting nameplate colour", true);
 
                     ApplyNameplateColour(nameplate, helper, trustColor, trustColor, textColor, null, resetMaterials);
+                }
+
+                if (randomColourLocal)
+                {
+                    var hash = hashing.ComputeHash(Encoding.UTF8.GetBytes(player.field_Private_APIUser_0.id));
+                    Color nameplateColour = new Color(hash[1] / 255f, hash[2] / 255f, hash[3] / 255f);
+
+                    ApplyNameplateColour(nameplate, helper, nameplateColour, nameplateColour, null, null, false);
                 }
 
                 //Jank custom colour system that isn't done
@@ -520,6 +543,12 @@ namespace BTKSANameplateMod
             if (closeRangeDistMax != MelonPreferences.GetEntryValue<float>(settingsCategory, nameplateCloseRangeDistMax))
             {
                 closeRangeDistMax = MelonPreferences.GetEntryValue<float>(settingsCategory, nameplateCloseRangeDistMax);
+                updated = true;
+            }
+
+            if (randomColourLocal != MelonPreferences.GetEntryValue<bool>(settingsCategory, nameplateRandomColours))
+            {
+                randomColourLocal = MelonPreferences.GetEntryValue<bool>(settingsCategory, nameplateRandomColours);
                 updated = true;
             }
 
