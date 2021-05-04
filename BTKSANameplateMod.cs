@@ -24,7 +24,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "2.3.0"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "2.3.1"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -163,7 +163,7 @@ namespace BTKSANameplateMod
         {
             if (ValidatePlayerAvatar(vrcPlayer))
             {
-                Player player = vrcPlayer.field_Private_Player_0;
+                Player player = vrcPlayer._player;
 
                 if (vrcPlayer.field_Public_PlayerNameplate_0 == null)
                     return;
@@ -453,7 +453,7 @@ namespace BTKSANameplateMod
                 hiddenNameplateUserIDs.Remove(QuickMenu.prop_QuickMenu_0.field_Private_APIUser_0.id);
 
             SaveHiddenNameplateFile();
-            OnAvatarIsReady(QuickMenu.prop_QuickMenu_0.field_Private_Player_0.field_Internal_VRCPlayer_0);
+            OnAvatarIsReady(QuickMenu.prop_QuickMenu_0.field_Private_Player_0._vrcplayer);
         }
 
         private void SaveHiddenNameplateFile()
@@ -591,7 +591,7 @@ namespace BTKSANameplateMod
             {
                 //Nameplate doesn't have a helper, lets fix that
                 if (__instance.field_Private_VRCPlayer_0 != null)
-                    if (__instance.field_Private_VRCPlayer_0.field_Private_Player_0 != null && __instance.field_Private_VRCPlayer_0.field_Private_Player_0.field_Private_APIUser_0 != null)
+                    if (__instance.field_Private_VRCPlayer_0._player != null && __instance.field_Private_VRCPlayer_0._player.field_Private_APIUser_0 != null)
                         instance.OnAvatarIsReady(__instance.field_Private_VRCPlayer_0);
             }
         }
@@ -601,8 +601,8 @@ namespace BTKSANameplateMod
             __instance.Method_Public_add_Void_MulticastDelegateNPublicSealedVoUnique_0(new Action(() => {
                 if (__instance != null)
                 {
-                    if (__instance.field_Private_Player_0 != null)
-                        if (__instance.field_Private_Player_0.field_Private_APIUser_0 != null)
+                    if (__instance._player != null)
+                        if (__instance._player.field_Private_APIUser_0 != null)
                             BTKSANameplateMod.instance.OnAvatarIsReady(__instance);
                 }
             }));
