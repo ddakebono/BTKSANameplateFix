@@ -24,7 +24,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "2.3.1"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "2.3.2"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -62,6 +62,7 @@ namespace BTKSANameplateMod
         float closeRangeDistMin = 2f;
         float closeRangeDistMax = 3f;
         bool randomColourLocal = false;
+        int scenesLoaded = 0;
 
         Sprite nameplateBGBackup;
 
@@ -77,7 +78,17 @@ namespace BTKSANameplateMod
 
         #endregion
 
-        public override void VRChat_OnUiManagerInit()
+        public override void OnSceneWasLoaded(int buildIndex, string sceneName)
+        {
+            if (scenesLoaded <= 2)
+            {
+                scenesLoaded++;
+                if (scenesLoaded == 2)
+                    UiManagerInit();
+            }
+        }
+
+        public void UiManagerInit()
         {
             Log("BTK Standalone: Nameplate Mod - Starting up");
 
@@ -120,14 +131,15 @@ namespace BTKSANameplateMod
             harmony.Patch(typeof(APIUser).GetMethod("IsFriendsWith", BindingFlags.Public | BindingFlags.Static), new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("FriendsPatch", BindingFlags.Public | BindingFlags.Static)));
 
             Log("Patching QM Open/Close functions", true);
-            MethodInfo closeQuickMenu = typeof(QuickMenu).GetMethods()
-                .Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && !mb.Name.Contains("PDM") && CheckUsed(mb, "Method_Public_Void_Int32_Boolean_")).First();
-
-            MethodInfo openQuickMenu = typeof(QuickMenu).GetMethods()
-                 .Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && mb.GetParameters().Any(pi => pi.HasDefaultValue == false)).First();
-
             try
             {
+                MethodInfo closeQuickMenu = typeof(QuickMenu).GetMethods()
+                    .Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && !mb.Name.Contains("PDM") && CheckUsed(mb, "Method_Private_Void_String_String_LoadErrorReason_")).First();
+
+                MethodInfo openQuickMenu = typeof(QuickMenu).GetMethods()
+                    .Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && !mb.Name.Contains("PDM") && CheckUsing(mb, "Method_Public_Static_Boolean_byref_Boolean_0", typeof(VRCInputManager))).First();
+
+
                 harmony.Patch(openQuickMenu, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("QMOpen", BindingFlags.Public | BindingFlags.Static)));
                 harmony.Patch(closeQuickMenu, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("QMClose", BindingFlags.Public | BindingFlags.Static)));
             }
@@ -666,9 +678,25 @@ namespace BTKSANameplateMod
         {
             try
             {
-                return UnhollowerRuntimeLib.XrefScans.XrefScanner.UsedBy(methodBase).Where(instance => instance.TryResolve() != null && instance.TryResolve().Name.Contains(methodName)).Any();
+                return XrefScanner.UsedBy(methodBase).Where(instance => instance.TryResolve() != null && instance.TryResolve().Name.Contains(methodName)).Any();
             }
             catch { }
+            return false;
+        }
+
+        public static bool CheckUsing(MethodInfo method, string match, Type type)
+        {
+            foreach (XrefInstance instance in XrefScanner.XrefScan(method))
+                if (instance.Type == XrefType.Method)
+                    try
+                    {
+                        if (instance.TryResolve().DeclaringType == type && instance.TryResolve().Name.Contains(match))
+                            return true;
+                    }
+                    catch
+                    {
+
+                    }
             return false;
         }
 
