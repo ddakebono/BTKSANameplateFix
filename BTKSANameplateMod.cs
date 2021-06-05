@@ -24,7 +24,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "2.3.2"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "2.3.3"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -134,11 +134,15 @@ namespace BTKSANameplateMod
             try
             {
                 MethodInfo closeQuickMenu = typeof(QuickMenu).GetMethods()
-                    .Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && !mb.Name.Contains("PDM") && CheckUsed(mb, "Method_Private_Void_String_String_LoadErrorReason_")).First();
+                    .Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && !mb.Name.Contains("PDM") && CheckUsed(mb, "Method_Public_Void_EnumNPublicSealedvaUnWoAvSoSeUsDeSaCuUnique_Boolean")).FirstOrDefault();
 
                 MethodInfo openQuickMenu = typeof(QuickMenu).GetMethods()
-                    .Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && !mb.Name.Contains("PDM") && CheckUsing(mb, "Method_Public_Static_Boolean_byref_Boolean_0", typeof(VRCInputManager))).First();
+                    .Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && !mb.Name.Contains("PDM") && CheckUsed(mb, "Method_Public_Void_24")).FirstOrDefault();
 
+                if (closeQuickMenu == null)
+                    Log("CloseQuickMenu function was not found!");
+                if (openQuickMenu == null)
+                    Log("OpenQuickMenu function was not found!");
 
                 harmony.Patch(openQuickMenu, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("QMOpen", BindingFlags.Public | BindingFlags.Static)));
                 harmony.Patch(closeQuickMenu, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("QMClose", BindingFlags.Public | BindingFlags.Static)));
@@ -231,7 +235,7 @@ namespace BTKSANameplateMod
                 }
 
                 //Check if the Nameplate should be hidden
-                if (hiddenNameplateUserIDs.Contains(player.field_Private_APIUser_0.id))
+                if (hiddenNameplateUserIDs.Contains(player.prop_APIUser_0.id))
                 {
                     Log("Hiding nameplate - HiddenSet", true);
                     helper.gameObject.transform.localScale = Vector3.zero;
@@ -241,7 +245,7 @@ namespace BTKSANameplateMod
                 //Trust colour replacer
                 if (!trustColourModeLocal.Equals("off") && !randomColourLocal)
                 {
-                    APIUser apiUser = player.field_Private_APIUser_0;
+                    APIUser apiUser = player.prop_APIUser_0;
 
                     Color? trustColor = null;
                     Color? textColor = null;
@@ -273,7 +277,7 @@ namespace BTKSANameplateMod
 
                 if (randomColourLocal)
                 {
-                    var hash = hashing.ComputeHash(Encoding.UTF8.GetBytes(player.field_Private_APIUser_0.id));
+                    var hash = hashing.ComputeHash(Encoding.UTF8.GetBytes(player.prop_APIUser_0.id));
                     Color nameplateColour = new Color(hash[1] / 255f, hash[2] / 255f, hash[3] / 255f);
 
                     ApplyNameplateColour(nameplate, helper, nameplateColour, nameplateColour, null, null, false);
@@ -327,9 +331,9 @@ namespace BTKSANameplateMod
                 //Disable nameplates on friends
                 if (hideFriendsLocal)
                 {
-                    if (player.field_Private_APIUser_0 != null)
+                    if (player.prop_APIUser_0 != null)
                     {
-                        if (APIUser.IsFriendsWith(player.field_Private_APIUser_0.id))
+                        if (APIUser.IsFriendsWith(player.prop_APIUser_0.id))
                         {
                             Log("Hiding Nameplate - FriendsHide", true);
                             helper.gameObject.transform.localScale = Vector3.zero;
@@ -603,7 +607,7 @@ namespace BTKSANameplateMod
             {
                 //Nameplate doesn't have a helper, lets fix that
                 if (__instance.field_Private_VRCPlayer_0 != null)
-                    if (__instance.field_Private_VRCPlayer_0._player != null && __instance.field_Private_VRCPlayer_0._player.field_Private_APIUser_0 != null)
+                    if (__instance.field_Private_VRCPlayer_0._player != null && __instance.field_Private_VRCPlayer_0._player.prop_APIUser_0 != null)
                         instance.OnAvatarIsReady(__instance.field_Private_VRCPlayer_0);
             }
         }
@@ -614,7 +618,7 @@ namespace BTKSANameplateMod
                 if (__instance != null)
                 {
                     if (__instance._player != null)
-                        if (__instance._player.field_Private_APIUser_0 != null)
+                        if (__instance._player.prop_APIUser_0 != null)
                             BTKSANameplateMod.instance.OnAvatarIsReady(__instance);
                 }
             }));
@@ -656,9 +660,9 @@ namespace BTKSANameplateMod
         {
             foreach (var player in PlayerManager.field_Private_Static_PlayerManager_0.field_Private_List_1_Player_0)
             {
-                if (player.field_Private_APIUser_0 != null)
+                if (player.prop_APIUser_0 != null)
                 {
-                    if (player.field_Private_APIUser_0.id.Equals(userID))
+                    if (player.prop_APIUser_0.id.Equals(userID))
                         return player;
                 }
             }
