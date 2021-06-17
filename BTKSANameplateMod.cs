@@ -1,5 +1,4 @@
-﻿using Harmony;
-using Il2CppSystem.Text;
+﻿using Il2CppSystem.Text;
 using MelonLoader;
 using System;
 using System.Collections.Generic;
@@ -8,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using HarmonyLib;
 using TMPro;
 using UIExpansionKit.API;
 using UnhollowerRuntimeLib;
@@ -24,7 +24,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "2.3.3"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "2.3.4"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -36,8 +36,8 @@ namespace BTKSANameplateMod
 
         public static bool IgnoreFriends = false;
         public static bool IsQMOpen = false;
-
-        public HarmonyInstance harmony;
+        public static Regex methodMatchRegex = new Regex("Method_Public_Void_\\d", RegexOptions.Compiled);
+        public static MethodInfo setMenuIndex;
 
         private string settingsCategory = "BTKSANameplateFix";
         private string hiddenCustomSetting = "enableHiddenCustomNameplates";
@@ -49,8 +49,6 @@ namespace BTKSANameplateMod
         private string nameplateCloseRangeDistMin = "nmCloseRangeDistMin";
         private string nameplateCloseRangeDistMax = "nmCloseRangeDistMax";
         private string nameplateRandomColours = "nmRandomColours";
-
-        private Regex methodMatchRegex = new Regex("Method_Public_Void_\\d", RegexOptions.Compiled);
 
         //Save prefs copy to compare for ReloadAllAvatars
         bool hiddenCustomLocal = false;
@@ -91,7 +89,7 @@ namespace BTKSANameplateMod
         public void UiManagerInit()
         {
             Log("BTK Standalone: Nameplate Mod - Starting up");
-
+            
             instance = this;
 
             if (MelonHandler.Mods.Any(x => x.Info.Name.Equals("BTKCompanionLoader", StringComparison.OrdinalIgnoreCase)))
@@ -100,6 +98,18 @@ namespace BTKSANameplateMod
                 MelonLogger.Error("BTKSANameplateMod has not started up! (BTKCompanion Running)");
                 return;
             }
+            
+            List<Type> quickMenuNestedEnums = typeof(QuickMenu).GetNestedTypes().Where(type => type.IsEnum).ToList();
+            PropertyInfo quickMenuEnumProperty = typeof(QuickMenu).GetProperties().First(pi => pi.PropertyType.IsEnum && quickMenuNestedEnums.Contains(pi.PropertyType));
+
+            setMenuIndex = typeof(QuickMenu).GetMethods().First(mb => mb.Name.StartsWith("Method_Public_Void_Enum") && !mb.Name.Contains("_PDM_") && mb.GetParameters().Length == 1 && mb.GetParameters()[0].ParameterType == quickMenuEnumProperty.PropertyType);
+            
+            //Apply patches
+            applyPatches(typeof(QuickMenuOpen));
+            applyPatches(typeof(QuickMenuClose));
+            applyPatches(typeof(NameplatePatches));
+            applyPatches(typeof(ApiUserPatches));
+            applyPatches(typeof(VRCPlayerPatches));
 
             MelonPreferences.CreateCategory(settingsCategory, "Nameplate Mod");
             MelonPreferences.CreateEntry<bool>(settingsCategory, hiddenCustomSetting, false, "Enable Custom Nameplates (Not ready)");
@@ -116,43 +126,7 @@ namespace BTKSANameplateMod
             //Register our menu button
             ExpansionKitApi.GetExpandedMenu(ExpandedMenu.UserQuickMenu).AddSimpleButton("Toggle Nameplate Visibility", ToggleNameplateVisiblity);
 
-            //Initalize Harmony
-            harmony = HarmonyInstance.Create("BTKStandalone");
-
-            harmony.Patch(typeof(VRCPlayer).GetMethod("Awake", BindingFlags.Public | BindingFlags.Instance), null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnVRCPlayerAwake", BindingFlags.NonPublic | BindingFlags.Static)));
-
-            foreach (MethodInfo method in typeof(PlayerNameplate).GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(x => methodMatchRegex.IsMatch(x.Name)))
-            {
-                Log($"Found target Rebuild method ({method.Name})", true);
-                harmony.Patch(method, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("OnRebuild", BindingFlags.NonPublic | BindingFlags.Static)));
-            }
-
-            //Loukylor is a fuckin nerd, also thanks for the things, very good shit
-            harmony.Patch(typeof(APIUser).GetMethod("IsFriendsWith", BindingFlags.Public | BindingFlags.Static), new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("FriendsPatch", BindingFlags.Public | BindingFlags.Static)));
-
-            Log("Patching QM Open/Close functions", true);
-            try
-            {
-                MethodInfo closeQuickMenu = typeof(QuickMenu).GetMethods()
-                    .Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && !mb.Name.Contains("PDM") && CheckUsed(mb, "Method_Public_Void_EnumNPublicSealedvaUnWoAvSoSeUsDeSaCuUnique_Boolean")).FirstOrDefault();
-
-                MethodInfo openQuickMenu = typeof(QuickMenu).GetMethods()
-                    .Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && !mb.Name.Contains("PDM") && CheckUsed(mb, "Method_Public_Void_24")).FirstOrDefault();
-
-                if (closeQuickMenu == null)
-                    Log("CloseQuickMenu function was not found!");
-                if (openQuickMenu == null)
-                    Log("OpenQuickMenu function was not found!");
-
-                harmony.Patch(openQuickMenu, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("QMOpen", BindingFlags.Public | BindingFlags.Static)));
-                harmony.Patch(closeQuickMenu, null, new HarmonyMethod(typeof(BTKSANameplateMod).GetMethod("QMClose", BindingFlags.Public | BindingFlags.Static)));
-            }
-            catch (Exception e)
-            {
-                Log("Unable to patch Quickmenu Open/Close functions!");
-            }
-
-            reloadAvatarsMethod = typeof(VRCPlayer).GetMethods().Where(method => method.Name.Contains("Method_Public_Void_Boolean_") && method.GetParameters().Any(param => param.IsOptional)).First();
+            reloadAvatarsMethod = typeof(VRCPlayer).GetMethods().First(method => method.Name.Contains("Method_Public_Void_Boolean_") && method.GetParameters().Any(param => param.IsOptional));
             if (reloadAvatarsMethod == null)
                 Log("Unable to get Reload All Avatars method!");
 
@@ -165,6 +139,19 @@ namespace BTKSANameplateMod
             LoadHiddenNameplateFromFile();
             //Load the settings to the local copy to compare with SettingsApplied
             getPrefsLocal();
+        }
+        
+        private void applyPatches(Type type)
+        {
+            try
+            {
+                HarmonyLib.Harmony.CreateAndPatchAll(type, "BTKHarmonyInstance");
+            }
+            catch(Exception e)
+            {
+                Log($"Failed while patching {type.Name}!");
+                MelonLogger.Error(e);
+            }
         }
 
         public override void OnPreferencesSaved()
@@ -594,58 +581,6 @@ namespace BTKSANameplateMod
             }
         }
 
-        #region Patches
-
-        private static void OnRebuild(PlayerNameplate __instance)
-        {
-            NameplateHelper helper = __instance.gameObject.GetComponent<NameplateHelper>();
-            if (helper != null)
-            {
-                helper.OnRebuild(IsQMOpen);
-            }
-            else
-            {
-                //Nameplate doesn't have a helper, lets fix that
-                if (__instance.field_Private_VRCPlayer_0 != null)
-                    if (__instance.field_Private_VRCPlayer_0._player != null && __instance.field_Private_VRCPlayer_0._player.prop_APIUser_0 != null)
-                        instance.OnAvatarIsReady(__instance.field_Private_VRCPlayer_0);
-            }
-        }
-
-        private static void OnVRCPlayerAwake(VRCPlayer __instance)
-        {
-            __instance.Method_Public_add_Void_MulticastDelegateNPublicSealedVoUnique_0(new Action(() => {
-                if (__instance != null)
-                {
-                    if (__instance._player != null)
-                        if (__instance._player.prop_APIUser_0 != null)
-                            BTKSANameplateMod.instance.OnAvatarIsReady(__instance);
-                }
-            }));
-        }
-
-        public static bool FriendsPatch(ref bool __result)
-        {
-            if (IgnoreFriends)
-            {
-                __result = false;
-                return false;
-            }
-            return true;
-        }
-
-        public static void QMOpen()
-        {
-            IsQMOpen = true;
-        }
-
-        public static void QMClose()
-        {
-            IsQMOpen = false;
-        }
-
-        #endregion
-
         #region Utils
 
         public static void Log(string log, bool dbg = false)
@@ -705,5 +640,92 @@ namespace BTKSANameplateMod
         }
 
         #endregion
+    }
+    
+    [HarmonyPatch]
+    class NameplatePatches 
+    {
+        static IEnumerable<MethodBase> TargetMethods()
+        {
+            return typeof(PlayerNameplate).GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(x => BTKSANameplateMod.methodMatchRegex.IsMatch(x.Name)).Cast<MethodBase>();
+        }
+
+        static void Postfix(PlayerNameplate __instance)
+        {
+            NameplateHelper helper = __instance.gameObject.GetComponent<NameplateHelper>();
+            if (helper != null)
+            {
+                helper.OnRebuild(BTKSANameplateMod.IsQMOpen);
+            }
+            else
+            {
+                //Nameplate doesn't have a helper, lets fix that
+                if (__instance.field_Private_VRCPlayer_0 != null)
+                    if (__instance.field_Private_VRCPlayer_0._player != null && __instance.field_Private_VRCPlayer_0._player.prop_APIUser_0 != null)
+                        BTKSANameplateMod.instance.OnAvatarIsReady(__instance.field_Private_VRCPlayer_0);
+            }
+        }
+    }
+    
+    [HarmonyPatch]
+    class QuickMenuOpen 
+    {
+        static IEnumerable<MethodBase> TargetMethods()
+        {
+            return typeof(QuickMenu).GetMethods().Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && BTKSANameplateMod.CheckUsing(mb, BTKSANameplateMod.setMenuIndex.Name, typeof(QuickMenu))).Cast<MethodBase>();
+        }
+
+        static void Postfix()
+        {
+            BTKSANameplateMod.IsQMOpen = true;
+        }
+    }
+
+    [HarmonyPatch]
+    class QuickMenuClose
+    {
+        static IEnumerable<MethodBase> TargetMethods()
+        {
+            return typeof(QuickMenu).GetMethods().Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && BTKSANameplateMod.CheckUsed(mb, BTKSANameplateMod.setMenuIndex.Name)).Cast<MethodBase>();
+        }
+
+        static void Postfix()
+        {
+            BTKSANameplateMod.IsQMOpen = false;
+        }
+    }
+    
+    [HarmonyPatch(typeof(APIUser))]
+    class ApiUserPatches 
+    {
+        [HarmonyPrefix]
+        [HarmonyPatch("IsFriendsWith")]
+        public static bool FriendsPatch(ref bool __result)
+        {
+            if (BTKSANameplateMod.IgnoreFriends)
+            {
+                __result = false;
+                return false;
+            }
+            return true;
+        }
+    }
+    
+    [HarmonyPatch(typeof(VRCPlayer))]
+    class VRCPlayerPatches
+    {
+        [HarmonyPostfix]
+        [HarmonyPatch("Awake")]
+        private static void OnVRCPlayerAwake(VRCPlayer __instance)
+        {
+            __instance.Method_Public_add_Void_MulticastDelegateNPublicSealedVoUnique_0(new Action(() => {
+                if (__instance != null)
+                {
+                    if (__instance._player != null)
+                        if (__instance._player.prop_APIUser_0 != null)
+                            BTKSANameplateMod.instance.OnAvatarIsReady(__instance);
+                }
+            }));
+        }
     }
 }
