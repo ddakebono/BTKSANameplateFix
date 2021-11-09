@@ -24,7 +24,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "2.3.4"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "2.4.0"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateFix/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -37,42 +37,41 @@ namespace BTKSANameplateMod
         public static bool IgnoreFriends = false;
         public static bool IsQMOpen = false;
         public static Regex methodMatchRegex = new Regex("Method_Public_Void_\\d", RegexOptions.Compiled);
-        public static MethodInfo setMenuIndex;
 
-        private string settingsCategory = "BTKSANameplateFix";
-        private string hiddenCustomSetting = "enableHiddenCustomNameplates";
-        private string hideFriendsNameplates = "hideFriendsNameplates";
-        private string trustColourMode = "trustColourMode";
-        private string nameplateOutlineMode = "nameplateOutline";
-        private string nameplateAlwaysShowQuickStats = "nmAlwaysShowQuickInfo";
-        private string nameplateCloseRangeFade = "nmCloseRangeFade";
-        private string nameplateCloseRangeDistMin = "nmCloseRangeDistMin";
-        private string nameplateCloseRangeDistMax = "nmCloseRangeDistMax";
-        private string nameplateRandomColours = "nmRandomColours";
+        private readonly string settingsCategory = "BTKSANameplateFix";
+        private readonly string hiddenCustomSetting = "enableHiddenCustomNameplates";
+        private readonly string hideFriendsNameplates = "hideFriendsNameplates";
+        private readonly string trustColourMode = "trustColourMode";
+        private readonly string nameplateOutlineMode = "nameplateOutline";
+        private readonly string nameplateAlwaysShowQuickStats = "nmAlwaysShowQuickInfo";
+        private readonly string nameplateCloseRangeFade = "nmCloseRangeFade";
+        private readonly string nameplateCloseRangeDistMin = "nmCloseRangeDistMin";
+        private readonly string nameplateCloseRangeDistMax = "nmCloseRangeDistMax";
+        private readonly string nameplateRandomColours = "nmRandomColours";
+        private readonly string NameplateCloseRangeFadeFriends = "nmCloseRangeFadeFriends";
 
         //Save prefs copy to compare for ReloadAllAvatars
-        bool hiddenCustomLocal = false;
-        bool hideFriendsLocal = false;
-        string trustColourModeLocal = "off";
-        bool nameplateOutlineModeLocal = false;
-        bool alwaysShowStatsLocal = false;
-        bool closeRangeFadeLocal = false;
-        float closeRangeDistMin = 2f;
-        float closeRangeDistMax = 3f;
-        bool randomColourLocal = false;
-        int scenesLoaded = 0;
+        private bool hiddenCustomLocal = false;
+        private bool hideFriendsLocal = false;
+        private string trustColourModeLocal = "off";
+        private bool nameplateOutlineModeLocal = false;
+        private bool alwaysShowStatsLocal = false;
+        private bool closeRangeFadeLocal = false;
+        private float closeRangeDistMin = 2f;
+        private float closeRangeDistMax = 3f;
+        private bool randomColourLocal = false;
+        private bool closeRangeFadeFriendsOnly = false;
+        private int scenesLoaded = 0;
 
-        Sprite nameplateBGBackup;
+        private Sprite nameplateBGBackup;
 
-        AssetBundle bundle;
-        Material npUIMaterial;
-        Sprite nameplateOutline;
+        private AssetBundle bundle;
+        private Material npUIMaterial;
+        private Sprite nameplateOutline;
 
-        List<string> hiddenNameplateUserIDs = new List<string>();
+        private List<string> hiddenNameplateUserIDs = new List<string>();
 
-        MethodInfo reloadAvatarsMethod;
-
-        MD5 hashing = MD5.Create();
+        private MethodInfo reloadAvatarsMethod;
 
         #endregion
 
@@ -88,7 +87,7 @@ namespace BTKSANameplateMod
 
         public void UiManagerInit()
         {
-            Log("BTK Standalone: Nameplate Mod - Starting up");
+            BTKUtil.Log("BTK Standalone: Nameplate Mod - Starting up");
             
             instance = this;
 
@@ -98,19 +97,9 @@ namespace BTKSANameplateMod
                 MelonLogger.Error("BTKSANameplateMod has not started up! (BTKCompanion Running)");
                 return;
             }
-            
-            List<Type> quickMenuNestedEnums = typeof(QuickMenu).GetNestedTypes().Where(type => type.IsEnum).ToList();
-            PropertyInfo quickMenuEnumProperty = typeof(QuickMenu).GetProperties().First(pi => pi.PropertyType.IsEnum && quickMenuNestedEnums.Contains(pi.PropertyType));
 
-            setMenuIndex = typeof(QuickMenu).GetMethods().First(mb => mb.Name.StartsWith("Method_Public_Void_Enum") && !mb.Name.Contains("_PDM_") && mb.GetParameters().Length == 1 && mb.GetParameters()[0].ParameterType == quickMenuEnumProperty.PropertyType);
+            BTKUtil.Log(settingsCategory);
             
-            //Apply patches
-            applyPatches(typeof(QuickMenuOpen));
-            applyPatches(typeof(QuickMenuClose));
-            applyPatches(typeof(NameplatePatches));
-            applyPatches(typeof(ApiUserPatches));
-            applyPatches(typeof(VRCPlayerPatches));
-
             MelonPreferences.CreateCategory(settingsCategory, "Nameplate Mod");
             MelonPreferences.CreateEntry<bool>(settingsCategory, hiddenCustomSetting, false, "Enable Custom Nameplates (Not ready)");
             MelonPreferences.CreateEntry<bool>(settingsCategory, hideFriendsNameplates, false, "Hide Friends Nameplates");
@@ -118,24 +107,31 @@ namespace BTKSANameplateMod
             MelonPreferences.CreateEntry<bool>(settingsCategory, nameplateOutlineMode, false, "Nameplate Outline Background");
             MelonPreferences.CreateEntry<bool>(settingsCategory, nameplateAlwaysShowQuickStats, false, "Always Show Quick Stats");
             MelonPreferences.CreateEntry<bool>(settingsCategory, nameplateCloseRangeFade, false, "Close Range Fade");
+            MelonPreferences.CreateEntry<bool>(settingsCategory, NameplateCloseRangeFadeFriends, false, "Close Range Fade Friends Only");
             MelonPreferences.CreateEntry<float>(settingsCategory, nameplateCloseRangeDistMin, 2f, "Close Range Min Distance");
             MelonPreferences.CreateEntry<float>(settingsCategory, nameplateCloseRangeDistMax, 3f, "Close Range Max Distance");
             MelonPreferences.CreateEntry<bool>(settingsCategory, nameplateRandomColours, false, "Random Nameplate Colours");
             ExpansionKitApi.RegisterSettingAsStringEnum(settingsCategory, trustColourMode, new[] { ("off", "Disable Trust Colours"), ("friends", "Show Friends Colour"), ("trustonly", "Ignore Friends Colour"), ("trustname", "Trust Colour On Name") });
+            
+            //Apply patches
+            applyPatches(typeof(QuickMenuPatches));
+            applyPatches(typeof(NameplatePatches));
+            applyPatches(typeof(ApiUserPatches));
+            applyPatches(typeof(VRCPlayerPatches));
 
             //Register our menu button
-            ExpansionKitApi.GetExpandedMenu(ExpandedMenu.UserQuickMenu).AddSimpleButton("Toggle Nameplate Visibility", ToggleNameplateVisiblity);
+            ExpansionKitApi.GetExpandedMenu(ExpandedMenu.UserQuickMenu).AddSimpleButton("Toggle Nameplate Visibility", ToggleNameplateVisibility);
 
             reloadAvatarsMethod = typeof(VRCPlayer).GetMethods().First(method => method.Name.Contains("Method_Public_Void_Boolean_") && method.GetParameters().Any(param => param.IsOptional));
             if (reloadAvatarsMethod == null)
-                Log("Unable to get Reload All Avatars method!");
+                BTKUtil.Log("Unable to get Reload All Avatars method!");
 
             ClassInjector.RegisterTypeInIl2Cpp<NameplateHelper>();
 
-            Log("Loading Nameplate Assets");
+            BTKUtil.Log("Loading Nameplate Assets");
             loadAssets();
 
-            Log("Loading HiddenNameplateUserIDs from file", true);
+            BTKUtil.Log("Loading HiddenNameplateUserIDs from file", true);
             LoadHiddenNameplateFromFile();
             //Load the settings to the local copy to compare with SettingsApplied
             getPrefsLocal();
@@ -149,7 +145,7 @@ namespace BTKSANameplateMod
             }
             catch(Exception e)
             {
-                Log($"Failed while patching {type.Name}!");
+                BTKUtil.Log($"Failed while patching {type.Name}!");
                 MelonLogger.Error(e);
             }
         }
@@ -164,7 +160,7 @@ namespace BTKSANameplateMod
 
         public void OnAvatarIsReady(VRCPlayer vrcPlayer)
         {
-            if (ValidatePlayerAvatar(vrcPlayer))
+            if (BTKUtil.ValidatePlayerAvatar(vrcPlayer))
             {
                 Player player = vrcPlayer._player;
 
@@ -177,7 +173,7 @@ namespace BTKSANameplateMod
                 {
                     helper = nameplate.gameObject.AddComponent<NameplateHelper>();
                     helper.SetNameplate(nameplate);
-                    Log("Fetching objects from hierarhcy", true);
+                    BTKUtil.Log("Fetching objects from hierarhcy", true);
                     helper.uiQuickStatsGO = nameplate.gameObject.transform.Find("Contents/Quick Stats").gameObject;
                     helper.uiIconBackground = nameplate.gameObject.transform.Find("Contents/Icon/Background").GetComponent<Image>();
                     helper.uiUserImage = nameplate.gameObject.transform.Find("Contents/Icon/User Image").GetComponent<RawImage>();
@@ -185,7 +181,7 @@ namespace BTKSANameplateMod
                     helper.uiNameBackground = nameplate.gameObject.transform.Find("Contents/Main/Background").GetComponent<ImageThreeSlice>();
                     helper.uiQuickStatsBackground = nameplate.gameObject.transform.Find("Contents/Quick Stats").GetComponent<ImageThreeSlice>();
                     helper.uiName = nameplate.gameObject.transform.Find("Contents/Main/Text Container/Name").GetComponent<TextMeshProUGUI>();
-                    Log("Created NameplateHelper on nameplate", true);
+                    BTKUtil.Log("Created NameplateHelper on nameplate", true);
                 }
 
                 resetNameplate(nameplate);
@@ -199,7 +195,7 @@ namespace BTKSANameplateMod
                 helper.AlwaysShowQuickInfo = alwaysShowStatsLocal;
 
                 //Enable close range fade
-                if (!vrcPlayer.name.Contains("Local") && closeRangeFadeLocal)
+                if (!vrcPlayer.name.Contains("Local") && closeRangeFadeLocal && (!closeRangeFadeFriendsOnly || APIUser.IsFriendsWith(vrcPlayer._player.prop_APIUser_0.id)))
                 {
                     helper.uiGroup = vrcPlayer.field_Public_PlayerNameplate_0.gameObject.GetComponent<CanvasGroup>();
                     helper.localPlayerGO = VRCVrCamera.field_Private_Static_VRCVrCamera_0.gameObject;
@@ -224,7 +220,7 @@ namespace BTKSANameplateMod
                 //Check if the Nameplate should be hidden
                 if (hiddenNameplateUserIDs.Contains(player.prop_APIUser_0.id))
                 {
-                    Log("Hiding nameplate - HiddenSet", true);
+                    BTKUtil.Log("Hiding nameplate - HiddenSet", true);
                     helper.gameObject.transform.localScale = Vector3.zero;
                     return;
                 }
@@ -246,9 +242,9 @@ namespace BTKSANameplateMod
 
                     if (trustColourModeLocal.Equals("trustonly"))
                     {
-                        BTKSANameplateMod.IgnoreFriends = true;
+                        IgnoreFriends = true;
                         trustColor = VRCPlayer.Method_Public_Static_Color_APIUser_0(apiUser);
-                        BTKSANameplateMod.IgnoreFriends = false;
+                        IgnoreFriends = false;
                     }
 
                     if (trustColourModeLocal.Equals("trustname"))
@@ -257,15 +253,14 @@ namespace BTKSANameplateMod
                         resetMaterials = true;
                     }
 
-                    Log("Setting nameplate colour", true);
+                    BTKUtil.Log("Setting nameplate colour", true);
 
                     ApplyNameplateColour(nameplate, helper, trustColor, trustColor, textColor, null, resetMaterials);
                 }
 
                 if (randomColourLocal)
                 {
-                    var hash = hashing.ComputeHash(Encoding.UTF8.GetBytes(player.prop_APIUser_0.id));
-                    Color nameplateColour = new Color(hash[1] / 255f, hash[2] / 255f, hash[3] / 255f);
+                    Color nameplateColour = BTKUtil.GetColourFromUserID(player.prop_APIUser_0.id);
 
                     ApplyNameplateColour(nameplate, helper, nameplateColour, nameplateColour, null, null, false);
                 }
@@ -322,7 +317,7 @@ namespace BTKSANameplateMod
                     {
                         if (APIUser.IsFriendsWith(player.prop_APIUser_0.id))
                         {
-                            Log("Hiding Nameplate - FriendsHide", true);
+                            BTKUtil.Log("Hiding Nameplate - FriendsHide", true);
                             helper.gameObject.transform.localScale = Vector3.zero;
                         }
                     }
@@ -343,7 +338,7 @@ namespace BTKSANameplateMod
             }
             else
             {
-                Log($"Warning: An avatar had an invalid HTML colour code set! {colourCode}");
+                BTKUtil.Log($"Warning: An avatar had an invalid HTML colour code set! {colourCode}");
             }
             return null;
         }
@@ -385,7 +380,7 @@ namespace BTKSANameplateMod
             if (helper == null)
                 return;
 
-            Log("Apply colours", true);
+            BTKUtil.Log("Apply colours", true);
 
             if (!resetToDefaultMat)
             {
@@ -448,15 +443,26 @@ namespace BTKSANameplateMod
             }
         }
 
-        private void ToggleNameplateVisiblity()
+        private void ToggleNameplateVisibility()
         {
-            if (!hiddenNameplateUserIDs.Contains(QuickMenu.prop_QuickMenu_0.field_Private_APIUser_0.id))
-                hiddenNameplateUserIDs.Add(QuickMenu.prop_QuickMenu_0.field_Private_APIUser_0.id);
+            APIUser user = BTKUtil.GetSelectedAPIUser();
+            if (user == null) return;
+            
+            ToggleNameplateVisibility(user.id);
+        }
+        
+        public void ToggleNameplateVisibility(string userid)
+        {
+            if (!hiddenNameplateUserIDs.Contains(userid))
+                hiddenNameplateUserIDs.Add(userid);
             else
-                hiddenNameplateUserIDs.Remove(QuickMenu.prop_QuickMenu_0.field_Private_APIUser_0.id);
+                hiddenNameplateUserIDs.Remove(userid);
 
             SaveHiddenNameplateFile();
-            OnAvatarIsReady(QuickMenu.prop_QuickMenu_0.field_Private_Player_0._vrcplayer);
+            Player player = BTKUtil.getPlayerFromPlayerlist(userid);
+            
+            if(player!=null)
+                OnAvatarIsReady(player._vrcplayer);
         }
 
         private void SaveHiddenNameplateFile()
@@ -555,6 +561,12 @@ namespace BTKSANameplateMod
                 updated = true;
             }
 
+            if (closeRangeFadeFriendsOnly != MelonPreferences.GetEntryValue<bool>(settingsCategory, NameplateCloseRangeFadeFriends))
+            {
+                closeRangeFadeFriendsOnly = MelonPreferences.GetEntryValue<bool>(settingsCategory, NameplateCloseRangeFadeFriends);
+                updated = true;
+            }
+
             return updated;
         }
 
@@ -562,7 +574,7 @@ namespace BTKSANameplateMod
         {
             using (var assetStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("BTKSANameplateMod.nmasset"))
             {
-                Log("Loaded Embedded resource");
+                BTKUtil.Log("Loaded Embedded resource");
                 using (var tempStream = new MemoryStream((int)assetStream.Length))
                 {
                     assetStream.CopyTo(tempStream);
@@ -580,66 +592,6 @@ namespace BTKSANameplateMod
                 nameplateOutline.hideFlags |= HideFlags.DontUnloadUnusedAsset;
             }
         }
-
-        #region Utils
-
-        public static void Log(string log, bool dbg = false)
-        {
-            if (!MelonDebug.IsEnabled() && dbg)
-                return;
-
-            MelonLogger.Msg(log);
-        }
-
-        public static Player getPlayerFromPlayerlist(string userID)
-        {
-            foreach (var player in PlayerManager.field_Private_Static_PlayerManager_0.field_Private_List_1_Player_0)
-            {
-                if (player.prop_APIUser_0 != null)
-                {
-                    if (player.prop_APIUser_0.id.Equals(userID))
-                        return player;
-                }
-            }
-            return null;
-        }
-
-        bool ValidatePlayerAvatar(VRCPlayer player)
-        {
-            return !(player == null ||
-                     player.isActiveAndEnabled == false ||
-                     player.field_Internal_Animator_0 == null ||
-                     player.field_Internal_GameObject_0 == null ||
-                     player.field_Internal_GameObject_0.name.IndexOf("Avatar_Utility_Base_") == 0);
-        }
-
-        public static bool CheckUsed(MethodBase methodBase, string methodName)
-        {
-            try
-            {
-                return XrefScanner.UsedBy(methodBase).Where(instance => instance.TryResolve() != null && instance.TryResolve().Name.Contains(methodName)).Any();
-            }
-            catch { }
-            return false;
-        }
-
-        public static bool CheckUsing(MethodInfo method, string match, Type type)
-        {
-            foreach (XrefInstance instance in XrefScanner.XrefScan(method))
-                if (instance.Type == XrefType.Method)
-                    try
-                    {
-                        if (instance.TryResolve().DeclaringType == type && instance.TryResolve().Name.Contains(match))
-                            return true;
-                    }
-                    catch
-                    {
-
-                    }
-            return false;
-        }
-
-        #endregion
     }
     
     [HarmonyPatch]
@@ -667,29 +619,19 @@ namespace BTKSANameplateMod
         }
     }
     
-    [HarmonyPatch]
-    class QuickMenuOpen 
+    [HarmonyPatch(typeof(VRC.UI.Elements.QuickMenu))]
+    class QuickMenuPatches
     {
-        static IEnumerable<MethodBase> TargetMethods()
-        {
-            return typeof(QuickMenu).GetMethods().Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && BTKSANameplateMod.CheckUsing(mb, BTKSANameplateMod.setMenuIndex.Name, typeof(QuickMenu))).Cast<MethodBase>();
-        }
-
-        static void Postfix()
+        [HarmonyPostfix]
+        [HarmonyPatch("OnEnable")]
+        private static void OnQuickMenuEnable()
         {
             BTKSANameplateMod.IsQMOpen = true;
         }
-    }
-
-    [HarmonyPatch]
-    class QuickMenuClose
-    {
-        static IEnumerable<MethodBase> TargetMethods()
-        {
-            return typeof(QuickMenu).GetMethods().Where(mb => mb.Name.StartsWith("Method_Public_Void_Boolean_") && mb.Name.Length <= 29 && BTKSANameplateMod.CheckUsed(mb, BTKSANameplateMod.setMenuIndex.Name)).Cast<MethodBase>();
-        }
-
-        static void Postfix()
+        
+        [HarmonyPostfix]
+        [HarmonyPatch("OnDisable")]
+        private static void OnQuickMenuDisable()
         {
             BTKSANameplateMod.IsQMOpen = false;
         }
@@ -718,7 +660,7 @@ namespace BTKSANameplateMod
         [HarmonyPatch("Awake")]
         private static void OnVRCPlayerAwake(VRCPlayer __instance)
         {
-            __instance.Method_Public_add_Void_MulticastDelegateNPublicSealedVoUnique_0(new Action(() => {
+            __instance.Method_Public_add_Void_OnAvatarIsReady_0(new Action(() => {
                 if (__instance != null)
                 {
                     if (__instance._player != null)
