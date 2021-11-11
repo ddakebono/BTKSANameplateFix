@@ -11,7 +11,7 @@ using MelonLoader;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("BTK-Development")]
 [assembly: AssemblyProduct("BTKSANameplateMod")]
-[assembly: AssemblyCopyright("Copyright ©  2020")]
+[assembly: AssemblyCopyright("Copyright ©  2021")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -33,8 +33,8 @@ using MelonLoader;
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("2.4.0")]
-[assembly: AssemblyFileVersion("2.4.0")]
+[assembly: AssemblyVersion("2.4.1")]
+[assembly: AssemblyFileVersion("2.4.1")]
 [assembly: MelonInfo(typeof(BTKSANameplateMod.BTKSANameplateMod), BTKSANameplateMod.BuildInfo.Name, BTKSANameplateMod.BuildInfo.Version, BTKSANameplateMod.BuildInfo.Author, BTKSANameplateMod.BuildInfo.DownloadLink)]
 [assembly: MelonGame("VRChat", "VRChat")]
 [assembly: HarmonyDontPatchAll]
