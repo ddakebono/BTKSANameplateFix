@@ -180,7 +180,7 @@ namespace BTKSANameplateMod
 
             var functionToggles = rootPage.AddCategory("Nameplate Mod");
 
-            var playerSelectCat = QuickMenuAPI.PlayerSelectPage.AddCategory("Nameplate Mod");
+            var playerSelectCat = QuickMenuAPI.PlayerSelectPage.AddCategory("Nameplate Mod", "BTKStandalone");
             var toggleNP = playerSelectCat.AddButton("Toggle Nameplate", "TurnOff", "Toggles this users nameplate off and on, this is saved");
             toggleNP.OnPress += () =>
             {
