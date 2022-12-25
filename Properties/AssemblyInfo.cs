@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using MelonLoader;
@@ -11,7 +12,7 @@ using MelonLoader;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("BTK-Development")]
 [assembly: AssemblyProduct("BTKSANameplateMod")]
-[assembly: AssemblyCopyright("Copyright ©  2021")]
+[assembly: AssemblyCopyright("Copyright ©  2022")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -36,5 +37,7 @@ using MelonLoader;
 [assembly: AssemblyVersion("2.4.1")]
 [assembly: AssemblyFileVersion("2.4.1")]
 [assembly: MelonInfo(typeof(BTKSANameplateMod.BTKSANameplateMod), BTKSANameplateMod.BuildInfo.Name, BTKSANameplateMod.BuildInfo.Version, BTKSANameplateMod.BuildInfo.Author, BTKSANameplateMod.BuildInfo.DownloadLink)]
-[assembly: MelonGame("VRChat", "VRChat")]
+[assembly: MelonGame("Alpha Blend Interactive", "ChilloutVR")]
+[assembly: MelonColor(ConsoleColor.DarkMagenta)]
+[assembly: MelonAuthorColor(ConsoleColor.DarkMagenta)]
 [assembly: HarmonyDontPatchAll]
