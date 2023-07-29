@@ -6,9 +6,9 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using ABI_RC.Core.InteractionSystem;
-using ABI_RC.Core.Networking;
 using ABI_RC.Core.Networking.IO.Social;
 using ABI_RC.Core.Player;
+using ABI_RC.Systems.GameEventSystem;
 using BTKSANameplateMod.Config;
 using BTKSASelfPortrait.Config;
 using BTKUILib;
@@ -26,7 +26,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "3.0.0"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "3.0.1"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateMod/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -70,25 +70,46 @@ namespace BTKSANameplateMod
             }
 
             //Apply patches
-            ApplyPatches(typeof(MenuManagerPatch));
             ApplyPatches(typeof(NameplatePatches));
             
             NameplatePatches.OnNameplateRebuild += OnNameplateRebuild;
-            MenuManagerPatch.OnToggleQM += OnToggleQM;
+
+            CVRGameEventSystem.QuickMenu.OnOpen.AddListener(() =>
+            {
+                try
+                {
+                    _isMenuOpen = true;
+                    foreach(var adjuster in ActiveAdjusters)
+                    {
+                        adjuster.MenuToggled(true);
+                    }
+                }
+                catch(Exception e)
+                {
+                    Logger.Error(e);
+                }
+            });
+            
+            CVRGameEventSystem.QuickMenu.OnClose.AddListener(() =>
+            {
+                try
+                {
+                    _isMenuOpen = false;
+                    foreach(var adjuster in ActiveAdjusters)
+                    {
+                        adjuster.MenuToggled(false);
+                    }
+                }
+                catch(Exception e)
+                {
+                    Logger.Error(e);
+                }
+            });
 
             Logger.Msg("Loading HiddenNameplateUserIDs from file", true);
             LoadHiddenNameplateFromFile();
 
             QuickMenuAPI.OnMenuRegenerate += SetupUI;
-        }
-
-        private void OnToggleQM(bool show)
-        {
-            _isMenuOpen = show;
-            foreach(var adjuster in ActiveAdjusters)
-            {
-                adjuster.MenuToggled(show);
-            }
         }
 
         private void OnNameplateRebuild(PlayerNameplate obj)
@@ -241,27 +262,7 @@ namespace BTKSANameplateMod
             return true;
         }
     }
-    
-    [HarmonyPatch(typeof(CVR_MenuManager))]
-    class MenuManagerPatch
-    {
-        internal static Action<bool> OnToggleQM;
-        
-        [HarmonyPatch(nameof(CVR_MenuManager.ToggleQuickMenu))]
-        [HarmonyPostfix]
-        static void OnTogglePatch(bool show)
-        {
-            try
-            {
-                OnToggleQM?.Invoke(show);
-            }
-            catch(Exception e)
-            {
-                BTKSANameplateMod.Logger.Error(e);
-            }
-        }
-    }
-    
+
     [HarmonyPatch(typeof(PlayerNameplate))]
     class NameplatePatches
     {
