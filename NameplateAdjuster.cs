@@ -32,7 +32,7 @@ namespace BTKSANameplateMod
             if (_isHidden || _isMenuOpen) return;
             if (!BTKSANameplateMod.CloseRangeFade.BoolValue && !BTKSANameplateMod.ScalingEnable.BoolValue) return;
             
-            float currentDist = Vector3.Distance(PlayerSetup.Instance._avatar.transform.position, _nameplate.transform.position);
+            float currentDist = Vector3.Distance(PlayerSetup.Instance.GetPlayerPosition(), _nameplate.transform.position);
 
             if (BTKSANameplateMod.CloseRangeFade.BoolValue && (!BTKSANameplateMod.CloseRangeFadeFriends.BoolValue || !isFriend))
             {

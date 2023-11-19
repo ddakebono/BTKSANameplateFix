@@ -26,7 +26,7 @@ namespace BTKSANameplateMod
         public const string Name = "BTKSANameplateMod"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "DDAkebono#0001"; // Author of the Mod.  (Set as null if none)
         public const string Company = "BTK-Development"; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "3.0.1"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "3.0.2"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/ddakebono/BTKSANameplateMod/releases"; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -44,6 +44,8 @@ namespace BTKSANameplateMod
         public static BTKFloatConfig ScalerMinSize = new(nameof(BTKSANameplateMod), "Nameplate Scale Min Size", "Minimum size that a nameplate can be scaled down to", 0.2f, 0f, 1f, null, false);
         public static BTKFloatConfig ScalerMaxDist = new(nameof(BTKSANameplateMod), "Nameplate Scale Start Range", "Distance that scaling begins at", 3f, 0f, 10f, null, false);
         public static List<NameplateAdjuster> ActiveAdjusters = new();
+
+        private static MethodInfo _btkGetCreatePageAdapter;
 
         private bool _isMenuOpen;
         private readonly List<string> _hiddenNameplateUserIDs = new();
@@ -67,6 +69,13 @@ namespace BTKSANameplateMod
                 Logger.Error("BTKUILib was not detected or it outdated! BTKCompanion cannot function without it!");
                 Logger.Error("Please download an updated copy for BTKUILib!");
                 return;
+            }
+
+            if (RegisteredMelons.Any(x => x.Info.Name.Equals("BTKUILib") && x.Info.SemanticVersion.CompareTo(new SemVersion(2, 0, 0)) <= 0))
+            {
+                //We're working with UILib 2.0.0, let's reflect the get create page function
+                _btkGetCreatePageAdapter = typeof(Page).GetMethod("GetOrCreatePage", BindingFlags.Public | BindingFlags.Static);
+                Logger.Msg($"BTKUILib 2.0.0 detected, attempting to grab GetOrCreatePage function: {_btkGetCreatePageAdapter != null}");
             }
 
             //Apply patches
@@ -195,7 +204,13 @@ namespace BTKSANameplateMod
             QuickMenuAPI.PrepareIcon("BTKStandalone", "Settings", Assembly.GetExecutingAssembly().GetManifestResourceStream("BTKSANameplateMod.Images.Settings.png"));
             QuickMenuAPI.PrepareIcon("BTKStandalone", "TurnOff", Assembly.GetExecutingAssembly().GetManifestResourceStream("BTKSANameplateMod.Images.TurnOff.png"));
 
-            var rootPage = new Page("BTKStandalone", "MainPage", true, "BTKIcon");
+            Page rootPage;
+
+            if (_btkGetCreatePageAdapter != null)
+                rootPage = (Page)_btkGetCreatePageAdapter.Invoke(null, new object[] { "BTKStandalone", "MainPage", true, "BTKIcon", null, false });
+            else
+                rootPage = new Page("BTKStandalone", "MainPage", true, "BTKIcon");
+
             rootPage.MenuTitle = "BTK Standalone Mods";
             rootPage.MenuSubtitle = "Toggle and configure your BTK Standalone mods here!";
 
