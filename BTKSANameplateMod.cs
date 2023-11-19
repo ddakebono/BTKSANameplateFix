@@ -71,7 +71,7 @@ namespace BTKSANameplateMod
                 return;
             }
 
-            if (RegisteredMelons.Any(x => x.Info.Name.Equals("BTKUILib") && x.Info.SemanticVersion.CompareTo(new SemVersion(2, 0, 0)) <= 0))
+            if (RegisteredMelons.Any(x => x.Info.Name.Equals("BTKUILib") && x.Info.SemanticVersion.CompareByPrecedence(new SemVersion(1, 9)) > 0))
             {
                 //We're working with UILib 2.0.0, let's reflect the get create page function
                 _btkGetCreatePageAdapter = typeof(Page).GetMethod("GetOrCreatePage", BindingFlags.Public | BindingFlags.Static);
